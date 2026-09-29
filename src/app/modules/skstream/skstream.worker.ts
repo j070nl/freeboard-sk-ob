@@ -123,6 +123,21 @@ let skToken!: string;
 const unsubscribe = [];
 let timers = [];
 let updateReceived = false;
+let vesselSubscriptionsActive = false;
+// Static subscriptions need not repeat unchanged identity when positions resume.
+// Keep only identity, never expired motion/position, bounded for long sessions.
+type VesselIdentity = Pick<
+  SKVessel,
+  | 'name'
+  | 'mmsi'
+  | 'type'
+  | 'callsignVhf'
+  | 'callsignHf'
+  | 'registrations'
+  | 'buddy'
+>;
+const expiredVesselIdentities = new Map<string, VesselIdentity>();
+const MAX_EXPIRED_IDENTITIES = 2000;
 
 let apiUrl: string; // path to Signal K api
 
@@ -150,7 +165,17 @@ const SERVER_TRACK_TAIL_CAP = 5000;
 
 // ** AIS target management **
 const targetFilter: AisFilter = { signalk: {}, aisState: [] };
-let targetExtent: Extent = [0, 0, 0, 0]; // ais target extent
+const vesselStaticSubscriptions = [
+  { path: '', period: 1000, policy: 'fixed' as const },
+  { path: 'buddy', period: 1000, policy: 'fixed' as const },
+  { path: 'uuid', period: 1000, policy: 'fixed' as const },
+  { path: 'name', period: 1000, policy: 'fixed' as const },
+  { path: 'mmsi', period: 1000, policy: 'fixed' as const },
+  { path: 'port', period: 1000, policy: 'fixed' as const },
+  { path: 'flag', period: 1000, policy: 'fixed' as const },
+  { path: 'design.aisShipType', period: 1000, policy: 'fixed' as const }
+];
+let targetExtent: Extent | null = null; // ais target extent
 let extRecalcInterval = 60; // number of message posts before re-calc of targetExtent
 let extRecalcCounter = 0;
 let targetStatus: AisStatus; // per interval ais target status
@@ -191,6 +216,9 @@ let apDeviceId = 'freeboard-sk';
 // ** Initialise message data structures **
 // exported as a test seam: establishes the payload openStream() sets up
 export function initVessels() {
+  expiredVesselIdentities.clear();
+  targetExtent = null;
+  extRecalcCounter = 0;
   vessels = {
     self: new SKVessel(),
     aisTargets: new Map(),
@@ -296,7 +324,7 @@ addEventListener('message', ({ data }) => {
         options: {..}
     }
  * **************************/
-function handleCommand(data: MsgFromApp) {
+export function handleCommand(data: MsgFromApp) {
   if (!data.cmd) {
     return;
   }
@@ -316,6 +344,9 @@ function handleCommand(data: MsgFromApp) {
     case 'subscribe':
       //console.log('Worker control: subscribing to paths...');
       stream.subscribe(data.options.context, data.options.path);
+      if (data.options.context === 'vessels.*') {
+        vesselSubscriptionsActive = true;
+      }
       break;
     //** { cmd: 'settings' , options: {..}
     case 'settings':
@@ -401,6 +432,7 @@ function applySettings(opt: WorkerSettings = {}) {
   }
   playbackMode = opt.playback ? true : false;
   if (opt.config) {
+    const vesselsWereEnabled = targetFilter.signalk.vessels === true;
     // Preferred path selection
     if (typeof opt.config.units.preferredPaths !== 'undefined') {
       preferredPaths = opt.config.units.preferredPaths;
@@ -418,7 +450,32 @@ function applySettings(opt: WorkerSettings = {}) {
       aisMgr.staleAge = opt.config.vessels.aisStaleAge;
     }
     if (typeof opt.config.signalk.maxRadius === 'number') {
+      if (targetFilter.signalk.maxRadius !== opt.config.signalk.maxRadius) {
+        targetExtent = null;
+      }
       targetFilter.signalk = opt.config.signalk;
+    }
+    const vesselsAreEnabled = targetFilter.signalk.vessels === true;
+    if (
+      shouldRefreshVesselStaticData(
+        vesselsWereEnabled,
+        vesselsAreEnabled,
+        vesselSubscriptionsActive
+      )
+    ) {
+      // The first local config can have AIS disabled while the authenticated
+      // server config is still loading. The initial cached identity/type replay
+      // is then filtered out. Replace just the static subscriptions when AIS is
+      // enabled so existing position-only targets recover immediately without
+      // duplicating the continuous navigation subscriptions.
+      stream.unsubscribe(
+        'vessels.*',
+        vesselStaticSubscriptions.map(({ path }) => ({ path }))
+      );
+      stream.subscribe(
+        'vessels.*',
+        vesselStaticSubscriptions.map((subscription) => ({ ...subscription }))
+      );
     }
     if (
       typeof opt.config.selections.aisState !== 'undefined' &&
@@ -441,6 +498,14 @@ function applySettings(opt: WorkerSettings = {}) {
 
     //console.log('Worker: AIS Filter...', targetFilter);
   }
+}
+
+export function shouldRefreshVesselStaticData(
+  wasEnabled: boolean,
+  isEnabled: boolean,
+  subscriptionsActive: boolean
+): boolean {
+  return !wasEnabled && isEnabled && subscriptionsActive;
 }
 
 // **************************************
@@ -810,6 +875,7 @@ function openStream(opt) {
   u[0] = u[0] === 'wss:' ? 'https:' : 'http:';
   apiUrl = u.join('/');
 
+  vesselSubscriptionsActive = false;
   initVessels();
   stream = new SKStreamAPI();
   unsubscribe.push(
@@ -983,10 +1049,22 @@ function filterContext(
     }
     // filter on max radius
     if (obj && targetFilter.signalk.maxRadius) {
-      if (
-        obj.positionReceived &&
-        GeoUtils.inBounds(obj.position, targetExtent)
-      ) {
+      // Static AIS reports commonly precede the position replay. Keep their
+      // identity/type until distance can actually be evaluated. They are not
+      // renderable yet, and the normal target-age cleanup still bounds lifetime.
+      if (!obj.positionReceived || !vessels.self.positionReceived) {
+        targetStatus.expired[context] = true;
+        delete targetStatus.updated[context];
+        return;
+      }
+      // The timer may not have ticked when cached positions arrive. Initialise
+      // the extent from the known own position before evaluating the first target.
+      targetExtent ??= GeoUtils.calcMapifiedExtent(
+        vessels.self.position,
+        targetFilter.signalk.maxRadius
+      );
+      if (GeoUtils.inBounds(obj.position, targetExtent)) {
+        delete targetStatus.expired[context];
         targetStatus.updated[context] = true;
       } else {
         group.delete(context);
@@ -1008,6 +1086,7 @@ function filterContext(
 //** POST message to App**
 function postUpdate(immediate = false) {
   if (!msgInterval || immediate) {
+    processAISStatus();
     const msg = new UpdateMessage();
     msg.watchDogAlarm = watchDog.alarm;
     msg.playback = playbackMode;
@@ -1021,7 +1100,6 @@ function postUpdate(immediate = false) {
     postMessage(msg);
     initAisTargetStatus();
     vessels.self.resourceUpdates = [];
-    processAISStatus(); // cleanup
     // extent calc
     if (extRecalcCounter === 0) {
       if (vessels.self.positionReceived && targetFilter?.signalk.maxRadius) {
@@ -1061,7 +1139,12 @@ function startTimers() {
           watchDog.msgCount = 0;
           watchDog.alarm = false;
         }
-        if (updateReceived) {
+        if (
+          updateReceived ||
+          vessels.aisTargets.size ||
+          vessels.aircraft.size ||
+          vessels.sar.size
+        ) {
           postUpdate(true);
           updateReceived = false;
         }
@@ -1084,6 +1167,8 @@ function selectVessel(id: string): SKVessel {
   if (!vessels.aisTargets.has(id)) {
     const vessel = new SKVessel();
     vessel.id = id;
+    Object.assign(vessel, expiredVesselIdentities.get(id));
+    expiredVesselIdentities.delete(id);
     vessel.position = null;
     vessels.aisTargets.set(id, vessel);
   }
@@ -1163,7 +1248,6 @@ export function processVessel(d: SKVessel, v: PathValue, isSelf = false) {
     }
     if (typeof value.mmsi !== 'undefined') {
       d.mmsi = value.mmsi;
-      d.lastUpdated = new Date();
     }
     if (typeof value.registrations !== 'undefined') {
       d.registrations = value.registrations;
@@ -1175,12 +1259,20 @@ export function processVessel(d: SKVessel, v: PathValue, isSelf = false) {
       d.callsignVhf = value.communication.callsignVhf ?? '';
       d.callsignHf = value.communication.callsignHf ?? '';
     }
+  } else if (v.path === 'name') {
+    d.name = value ?? '';
+  } else if (v.path === 'mmsi') {
+    d.mmsi = value ?? '';
   } else if (v.path === 'communication.callsignVhf') {
     d.callsignVhf = value;
   } else if (v.path === 'communication.callsignHf') {
     d.callsignHf = value;
   } else if (v.path === 'design.aisShipType') {
     d.type = value;
+  } else if (v.path === 'design.aisShipType.id') {
+    d.type = { ...(d.type ?? { id: -1, name: '' }), id: value ?? -1 };
+  } else if (v.path === 'design.aisShipType.name') {
+    d.type = { ...(d.type ?? { id: -1, name: '' }), name: value ?? '' };
   } else if (v.path === 'navigation.position' && value) {
     // position is not null
     if (
@@ -1189,11 +1281,25 @@ export function processVessel(d: SKVessel, v: PathValue, isSelf = false) {
     ) {
       return;
     } // invalid
+    // Cached/replayed AIS data must retain its original age. Own-vessel and
+    // playback freshness deliberately use the local receipt clock.
+    const reportTime = Date.parse($timestamp ?? '');
+    const positionTime =
+      !isSelf && !playbackMode && Number.isFinite(reportTime)
+        ? Math.min(reportTime, Date.now())
+        : Date.now();
+    if (
+      !isSelf &&
+      d.positionReceived &&
+      positionTime < d.lastUpdated.valueOf()
+    ) {
+      return;
+    }
     d.position = GeoUtils.normaliseCoords([value.longitude, value.latitude]);
     d.positionReceived = true;
     d.positionTimestamp = $timestamp ?? '';
     d.positionUpdatedAt = Date.now();
-    d.lastUpdated = new Date();
+    d.lastUpdated = new Date(positionTime);
     if (!isSelf) {
       appendTrack(d);
     }
@@ -1368,6 +1474,32 @@ function processAISStatus() {
     //if not present then mark for deletion
     if (v.lastUpdated.valueOf() < now - aisMgr.maxAge) {
       targetStatus.expired[k] = true;
+      delete targetStatus.updated[k];
+      delete targetStatus.stale[k];
+      const {
+        name,
+        mmsi,
+        type,
+        callsignVhf,
+        callsignHf,
+        registrations,
+        buddy
+      } = v;
+      expiredVesselIdentities.delete(k);
+      expiredVesselIdentities.set(k, {
+        name,
+        mmsi,
+        type,
+        callsignVhf,
+        callsignHf,
+        registrations,
+        buddy
+      });
+      if (expiredVesselIdentities.size > MAX_EXPIRED_IDENTITIES) {
+        expiredVesselIdentities.delete(
+          expiredVesselIdentities.keys().next().value
+        );
+      }
       vessels.aisTargets.delete(k);
     } else if (v.lastUpdated.valueOf() < now - aisMgr.staleAge) {
       //if stale then mark inactive

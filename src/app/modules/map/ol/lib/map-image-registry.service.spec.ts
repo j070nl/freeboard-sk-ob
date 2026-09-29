@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { Circle as CircleStyle, Icon } from 'ol/style';
 import {
   MapImageRegistry,
   WIND_ARROW_SYMBOL,
@@ -111,5 +112,25 @@ describe('MapImageRegistry current arrows (#521)', () => {
     // Overrides are geographic vectors too — they must rotate with the view.
     expect(ocean.getRotateWithView()).toBe(true);
     expect(tidal.getRotateWithView()).toBe(true);
+  });
+});
+
+describe('MapImageRegistry AIS vessel classes', () => {
+  it('keeps unknown neutral and resolves passenger class 60 to blue artwork', () => {
+    const reg = new MapImageRegistry();
+    expect((reg.getVessel('default') as Icon).getSrc()).toContain(
+      'ais_unknown.svg'
+    );
+    expect((reg.getVessel(60) as Icon).getSrc()).toContain('ais_passenger.svg');
+  });
+
+  it('keeps moored unknown neutral and passenger class blue', () => {
+    const reg = new MapImageRegistry();
+    expect(
+      (reg.getVessel('default', true) as CircleStyle).getFill()?.getColor()
+    ).toBe('#B8B8B8');
+    expect((reg.getVessel(60, true) as CircleStyle).getFill()?.getColor()).toBe(
+      '#0026FF'
+    );
   });
 });

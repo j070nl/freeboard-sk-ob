@@ -3,10 +3,13 @@ import {
   apiGet,
   applyServerAisTracks,
   handleStreamEvent,
+  handleCommand,
   initVessels,
   processVessel,
+  shouldRefreshVesselStaticData,
   timedTrail
 } from './skstream.worker';
+import { SKStreamAPI } from './stream-api';
 import { SKVessel } from '../skresources/resource-classes';
 
 // getVesselTrail() fetches the server-side "self" track with several apiGet()
@@ -148,6 +151,43 @@ describe('skstream.worker handleStreamEvent — watchdog on disconnect (#695)', 
 // pointed at GPS noise while a valid heading sat unused on the bus (#704).
 // Guard the delta-level contract: heading deltas stamp a receipt time, and an
 // unset/auto preference orients by heading rather than COG.
+describe('skstream.worker processVessel — late AIS identity and type', () => {
+  it('moves an existing unknown target to passenger class when static data arrives', () => {
+    const vessel = new SKVessel();
+    processVessel(vessel, { path: 'name', value: 'OUDE WETERING 1' });
+    processVessel(vessel, { path: 'mmsi', value: '244058001' });
+    processVessel(vessel, { path: 'design.aisShipType.id', value: 69 });
+    processVessel(vessel, {
+      path: 'design.aisShipType.name',
+      value: 'Passenger ship (no additional information)'
+    });
+    expect(vessel).toMatchObject({
+      name: 'OUDE WETERING 1',
+      mmsi: '244058001',
+      type: { id: 69, name: 'Passenger ship (no additional information)' }
+    });
+  });
+
+  it('clears an invalidated type id back to unknown', () => {
+    const vessel = new SKVessel();
+    vessel.type = { id: 69, name: 'Passenger' };
+    processVessel(vessel, { path: 'design.aisShipType.id', value: null });
+    expect(vessel.type).toEqual({ id: -1, name: 'Passenger' });
+  });
+});
+
+describe('skstream.worker — static AIS replay after settings load', () => {
+  it('refreshes static subscriptions when the final config enables vessels', () => {
+    expect(shouldRefreshVesselStaticData(false, true, true)).toBe(true);
+  });
+
+  it('does not refresh before subscriptions exist or for unrelated settings', () => {
+    expect(shouldRefreshVesselStaticData(false, true, false)).toBe(false);
+    expect(shouldRefreshVesselStaticData(true, true, true)).toBe(false);
+    expect(shouldRefreshVesselStaticData(true, false, true)).toBe(false);
+  });
+});
+
 describe('skstream.worker processVessel — orientation source (#704)', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -369,5 +409,180 @@ describe('skstream.worker timedTrail — trail recording times (#821)', () => {
       ])
     ).toBeUndefined();
     expect(timedTrail([null, null])).toBeUndefined();
+  });
+});
+
+describe('AIS radius filter retains static reports before position', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+  it('preserves name and passenger type when they precede own and target position', () => {
+    vi.spyOn(SKStreamAPI.prototype, 'open').mockImplementation(() => {});
+    vi.spyOn(SKStreamAPI.prototype, 'isSelf').mockImplementation(
+      (message) => message.context === 'vessels.self'
+    );
+    const post = vi.fn();
+    vi.stubGlobal('postMessage', post);
+    handleCommand({
+      cmd: 'open',
+      options: {
+        url: 'ws://localhost/signalk/v1/stream',
+        config: {
+          units: {},
+          vessels: {},
+          selections: {},
+          signalk: { vessels: true, maxRadius: 10000 }
+        }
+      }
+    });
+    const context = 'vessels.urn:mrn:imo:mmsi:244690490';
+    const delta = (
+      context: string,
+      values: { path: string; value: unknown }[]
+    ) =>
+      handleStreamEvent({
+        action: 'onMessage',
+        msg: {
+          context,
+          updates: [{ timestamp: new Date().toISOString(), values }]
+        }
+      });
+    delta(context, [
+      { path: '', value: { name: 'KONINGIN JULIANA', mmsi: '244690490' } }
+    ]);
+    delta(context, [
+      { path: 'design.aisShipType', value: { id: 69, name: 'Passenger' } }
+    ]);
+    delta('vessels.self', [
+      {
+        path: 'navigation.position',
+        value: { longitude: 4.63, latitude: 52.21 }
+      }
+    ]);
+    delta(context, [
+      {
+        path: 'navigation.position',
+        value: { longitude: 4.629, latitude: 52.215 }
+      }
+    ]);
+    const far = 'vessels.far';
+    delta(far, [
+      { path: 'navigation.position', value: { longitude: 5, latitude: 53 } }
+    ]);
+    // Closing posts the accumulated worker payload immediately, without timers.
+    handleCommand({ cmd: 'close', options: {} });
+    handleStreamEvent({ action: 'onError', msg: {} });
+    const update = post.mock.calls
+      .map(([message]) => message)
+      .find((message) => message.action === 'update');
+    expect(update.result.aisTargets.has(far)).toBe(false);
+    expect(update.result.aisStatus.expired).toContain(far);
+    expect(update.result.aisStatus.expired).not.toContain(context);
+    expect(update.result.aisStatus.updated).toContain(context);
+    expect(update.result.aisTargets.get(context)).toMatchObject({
+      name: 'KONINGIN JULIANA',
+      mmsi: '244690490',
+      type: { id: 69, name: 'Passenger' },
+      position: [4.629, 52.215]
+    });
+  });
+});
+
+describe('AIS position age and silent-stream cleanup', () => {
+  const context = 'vessels.urn:mrn:imo:mmsi:244123456';
+  let post: ReturnType<typeof vi.fn>;
+  const send = (
+    timestamp: string,
+    values: { path: string; value: unknown }[]
+  ) =>
+    handleStreamEvent({
+      action: 'onMessage',
+      msg: { context, updates: [{ timestamp, values }] }
+    });
+  const position = [
+    { path: 'navigation.position', value: { latitude: 52.2, longitude: 4.6 } }
+  ];
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-29T15:47:00Z'));
+    vi.spyOn(SKStreamAPI.prototype, 'open').mockImplementation(() => {});
+    vi.spyOn(SKStreamAPI.prototype, 'isSelf').mockReturnValue(false);
+    post = vi.fn();
+    vi.stubGlobal('postMessage', post);
+    handleCommand({
+      cmd: 'open',
+      options: {
+        url: 'ws://localhost/signalk/v1/stream',
+        config: {
+          units: {},
+          vessels: { aisStaleAge: 360000, aisMaxAge: 540000 },
+          selections: {},
+          signalk: { vessels: true, maxRadius: 0 }
+        }
+      }
+    });
+    handleStreamEvent({
+      action: 'onMessage',
+      msg: { name: 'test', version: '1', self: 'vessels.self' }
+    });
+  });
+  afterEach(() => {
+    handleCommand({ cmd: 'close', options: {} });
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+  const latest = () =>
+    post.mock.calls
+      .map(([m]) => m)
+      .filter((m) => m.action === 'update')
+      .at(-1);
+  it('expires a cached twelve-minute-old position immediately', () => {
+    send('2026-09-29T15:35:00Z', position);
+    handleStreamEvent({ action: 'onError', msg: {} });
+    expect(latest().result.aisTargets.has(context)).toBe(false);
+    expect(latest().result.aisStatus.expired).toContain(context);
+    expect(latest().result.aisStatus.updated).not.toContain(context);
+  });
+  it('does not rejuvenate a position with cached identity or an older position', () => {
+    send('2026-09-29T15:40:00Z', position);
+    send('2026-09-29T15:47:00Z', [
+      { path: '', value: { mmsi: '244123456', name: 'Test' } }
+    ]);
+    send('2026-09-29T15:39:00Z', position);
+    handleStreamEvent({ action: 'onError', msg: {} });
+    expect(
+      latest().result.aisTargets.get(context).lastUpdated.toISOString()
+    ).toBe('2026-09-29T15:40:00.000Z');
+    expect(latest().result.aisStatus.stale).toContain(context);
+  });
+  it('marks stale and expires without any subsequent stream messages', () => {
+    send('2026-09-29T15:47:00Z', position);
+    vi.advanceTimersByTime(361000);
+    expect(latest().result.aisStatus.stale).toContain(context);
+    vi.advanceTimersByTime(180000);
+    expect(latest().result.aisTargets.has(context)).toBe(false);
+  });
+  it('restores identity and class when fresh positions return after expiry', () => {
+    send('2026-09-29T15:47:00Z', [
+      { path: '', value: { name: 'Passenger Test', mmsi: '244123456' } },
+      { path: 'design.aisShipType', value: { id: 69, name: 'Passenger' } },
+      ...position
+    ]);
+    vi.advanceTimersByTime(541000);
+    expect(latest().result.aisTargets.has(context)).toBe(false);
+    send(new Date().toISOString(), position);
+    vi.advanceTimersByTime(500);
+    expect(latest().result.aisTargets.get(context)).toMatchObject({
+      name: 'Passenger Test',
+      mmsi: '244123456',
+      type: { id: 69 },
+      positionReceived: true
+    });
+    expect(latest().result.aisStatus.updated).toContain(context);
+    expect(latest().result.aisStatus.stale).not.toContain(context);
+    expect(latest().result.aisStatus.expired).not.toContain(context);
   });
 });

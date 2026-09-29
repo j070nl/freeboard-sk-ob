@@ -15,6 +15,7 @@ import { AISBaseLayerComponent } from './ais-base.component';
 import { SKVessel } from 'src/app/modules/skresources';
 import { fromLonLatArray } from '../util';
 import { MapImageRegistry } from '../map-image-registry.service';
+import { isValidAisShipTypeId } from 'src/app/modules/icons';
 
 // ** Signal K AIS Vessel targets **
 @Component({
@@ -24,6 +25,7 @@ import { MapImageRegistry } from '../map-image-registry.service';
   standalone: false
 })
 export class AISVesselsLayerComponent extends AISBaseLayerComponent {
+  protected override labelFont = '12px sans-serif';
   @Input() cogLineLength = 0;
 
   constructor(
@@ -146,8 +148,8 @@ export class AISVesselsLayerComponent extends AISBaseLayerComponent {
     let s: Style;
     const isMoored = target.state === 'moored';
 
-    const shipClass = target.type.id
-      ? Math.abs(Math.floor(target.type.id / 10) * 10)
+    const shipClass = isValidAisShipTypeId(target.type?.id)
+      ? Math.floor(target.type.id / 10) * 10
       : -1;
 
     const icon =
