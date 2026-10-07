@@ -84,10 +84,10 @@ interface ParentMessage {
 // App details
 const FSK: AppInfoDef = {
   id: 'freeboard',
-  name: 'Freeboard-SK',
+  name: 'Freeboard OpenBridge',
   description: `Signal K Chart Plotter.`,
   version: PACKAGE_VERSION,
-  url: 'https://github.com/signalk/freeboard-sk',
+  url: 'https://github.com/j070nl/freeboard-sk-ob',
   logo: './assets/img/app_logo.png'
 };
 

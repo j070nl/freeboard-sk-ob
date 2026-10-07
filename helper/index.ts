@@ -1,5 +1,6 @@
 import { Context, Plugin, ServerAPI, SKVersion } from '@signalk/server-api';
 import { IRouter, Application, Request, Response } from 'express';
+import { registerLegacyUrl } from './legacy-url';
 import { initAlarms, shutdownAlarms } from './alarms/alarms';
 
 import * as openapi from './openApi.json';
@@ -30,7 +31,7 @@ module.exports = (server: FreeboardHelperApp): Plugin => {
   // ******** REQUIRED PLUGIN DEFINITION *******
   const plugin: Plugin = {
     id: 'freeboard-sk',
-    name: 'Freeboard-SK',
+    name: 'Freeboard OpenBridge',
     schema: () => CONFIG_SCHEMA,
     uiSchema: () => CONFIG_UISCHEMA,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,6 +42,7 @@ module.exports = (server: FreeboardHelperApp): Plugin => {
       doShutdown();
     },
     registerWithRouter: (router) => {
+      registerLegacyUrl(server);
       return initApiEndpoints(router);
     },
     getOpenApi: () => openapi

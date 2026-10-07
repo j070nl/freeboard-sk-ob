@@ -1,7 +1,7 @@
 {
-  "name": "@signalk/freeboard-sk",
-  "version": "3.2.1-openbridge.1",
-  "description": "Openlayers chart plotter implementation for Signal K",
+  "name": "@j070nl/freeboard-openbridge",
+  "version": "3.2.1-openbridge.2",
+  "description": "Freeboard OpenBridge chartplotter for Signal K, with custom OpenBridge UI and AIS recovery",
   "keywords": [
     "signalk-webapp",
     "signalk-node-server-plugin",
@@ -15,7 +15,7 @@
     "CHANGELOG.md"
   ],
   "signalk": {
-    "displayName": "Freeboard-SK",
+    "displayName": "Freeboard OpenBridge",
     "appIcon": "assets/icons/icon-192x192.png",
     "screenshots": [
       "./docs/screenshots/1_freeboard-sk.png",
@@ -141,5 +141,16 @@
     "vitest": "^4.0.18",
     "xml2js": "^0.6.2",
     "zone.js": "~0.16.2"
-  }
+  },
+  "bundleDependencies": [
+    "@signalk/server-api",
+    "geolib",
+    "google-protobuf",
+    "remark-gfm",
+    "remark-parse",
+    "signalk-plotterext-bus",
+    "tslib",
+    "unified",
+    "uuid"
+  ]
 }

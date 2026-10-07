@@ -1,12 +1,12 @@
 {
-  "name": "Freeboard-SK",
-  "short_name": "Freeboard",
+  "name": "Freeboard OpenBridge",
+  "short_name": "Freeboard OB",
   "description": "Signal K Chartplotter",
   "theme_color": "#1976d2",
   "background_color": "#fafafa",
   "display": "standalone",
   "orientation": "any",
-  "scope": "/@signalk/freeboard-sk/",
+  "scope": "/@j070nl/freeboard-openbridge/",
   "start_url": "./index.html",
   "icons": [
     {

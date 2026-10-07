@@ -33,6 +33,14 @@ The system map is [/home/pi/openplotter-project/PROJECT_STATE.md](/home/pi/openp
 - Existing local release tooling and historical rollback commands are not
   deployment authorization. Check the latest verified manifest before rollback.
 
+## Standalone package identity
+
+Current maintained package is `@j070nl/freeboard-openbridge`, branch
+`openbridge/standalone`; see STANDALONE_PACKAGE.md. Preserve internal plugin ID
+`freeboard-sk`, profile ID `freeboard`, existing API/URL compatibility and a single
+active helper. The upstream package must not be simultaneously installed. Earlier
+installed-path/version descriptions below are historical.
+
 ## Maintaining the boat fork
 
 `openbridge/upstream-3.2.1` is our integration branch, version

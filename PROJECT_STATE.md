@@ -1,5 +1,15 @@
 # Project state
 
+## Standalone package prepared — 2026-10-07
+
+Branch openbridge/standalone; @j070nl/freeboard-openbridge 3.2.1-openbridge.2.
+Own app name/URL/PWA scope; helper ID and app/profile ID retained. Legacy URL
+redirect preserves SKIP and bookmarks without a second package. Dependencies
+bundled in installation archive. 21 helper tests, 18 targeted UI tests, complete
+helper/web build and packed-helper load pass. Targeted lint/diff checks apply.
+Deployment/rollback evidence will be recorded in central SYSTEM_STATE.md.
+See STANDALONE_PACKAGE.md; prior package identity notes below are historical.
+
 ## Freeboard OpenBridge 3.2.1 LIVE — 2026-10-07
 
 User-authorized static frontend deployment from integration commit 53ace85a.
