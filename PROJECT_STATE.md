@@ -1,5 +1,29 @@
 # Project state
 
+## Current source and tested integration — 2026-10-07
+
+All prior custom tracked/untracked work was committed as baseline `d61be436`.
+This original checkout remains on `fix/ais-target-lifecycle`, package version
+3.2.0-beta.4; its application files have not been replaced by the integration.
+The older descriptions of dirty/untracked work below are historical snapshots.
+
+The separate candidate at `/home/pi/openplotter-project/worktrees/freeboard-3.2.1`
+is version **3.2.1-openbridge.1**, branch `openbridge/upstream-3.2.1`, merge commit
+`53ace85af81a5d7a8514542e5e2ce7b9292c1f36`. Pushed successfully to
+https://github.com/j070nl/freeboard-sk-ob/tree/openbridge/upstream-3.2.1.
+That history includes the baseline and upstream v3.2.1; no force-push or npm release.
+101 focused tests in 15 files, targeted lint, strict-template production web build
+and integration diff check passed. Build warnings: advisory bundle size, CommonJS,
+and upstream cdkDragPlaceholder import. Tests use fixtures; no field validation.
+
+All 293 live frontend manifest hashes still match the previous release. No runtime
+files, configs, services or hardware changed. Next: prepare/review a frontend
+release and rollback inputs before deployment. Source restore is documented in
+central RECOVERY.md; no operational restore rehearsal occurred.
+[Step 2 evidence](/home/pi/openplotter-project/recovery/freeboard-3.2.1-step2/REPORT.md).
+
+## Historical state below — superseded where noted above
+
 ## Freeboard 3.2.1 step-1 comparison — 2026-10-07
 
 Compared current tracked and untracked custom source with official 3.2.1
