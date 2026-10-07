@@ -20,14 +20,15 @@ const appStub = {
  * "from" bearing), matching the meteo targets. `createWindStyle` reads only plain
  * fields + the registry, so exercise it on a bare prototype instance.
  */
-function grid(indicator: 'arrow' | 'barb') {
+function grid(indicator: 'arrow' | 'barb', palette = 'day') {
   const c = Object.create(
     LayerWindWeatherComponent.prototype
   ) as LayerWindWeatherComponent;
   Object.assign(c, {
     indicator,
     mapImages: new MapImageRegistry(),
-    app: appStub
+    app: appStub,
+    theme: { theme: () => palette }
   });
   return c as unknown as {
     createWindStyle: (f: FeatureLike) => import('ol/style/Style').default;
@@ -63,4 +64,23 @@ describe('LayerWindWeatherComponent.createWindStyle (#513)', () => {
     expect(icon.getSrc()).toContain('weather_station.png');
     expect(icon.getRotation()).toBe(0);
   });
+});
+
+describe('wind label appearance', () => {
+  it.each(['day', 'bright', 'dusk', 'night'])(
+    'keeps labels readable in %s',
+    (palette) => {
+      const dark = palette === 'dusk' || palette === 'night';
+      for (const indicator of ['arrow', 'barb'] as const) {
+        const text = grid(indicator, palette)
+          .createWindStyle(sample(6, 1.2))
+          .getText();
+        expect(text.getFont()).toBe('600 13px "Noto Sans", Arial, sans-serif');
+        expect(text.getFill().getColor()).toBe(dark ? '#e0c99f' : '#25323b');
+        expect(text.getStroke().getColor()).toBe(dark ? '#151b20' : '#edf1f4');
+        expect(text.getOffsetY()).toBe(indicator === 'arrow' ? 26 : 10);
+        expect(text.getText()).toBe('12 kn');
+      }
+    }
+  );
 });

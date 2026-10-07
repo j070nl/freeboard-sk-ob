@@ -158,3 +158,25 @@ describe('cleanConfig() legacy migration', () => {
     expect(Object.keys(cfg).sort()).toEqual(Object.keys(current).sort());
   });
 });
+
+describe('OpenBridge stored preferences', () => {
+  it('migrates manual dark without changing independent night or chart settings', () => {
+    const cfg = defaultConfig();
+    cfg.display.darkMode.source = -1;
+    cfg.display.nightMode = true;
+    cfg.ui.invertColor = true;
+    cleanConfig(cfg, {});
+    expect(cfg.display.darkMode.source).toBe('dusk');
+    expect(cfg.display.nightMode).toBe(true);
+    expect(cfg.ui.invertColor).toBe(true);
+  });
+  it('preserves each named theme across serialized configuration reload', () => {
+    for (const theme of ['bright', 'day', 'dusk', 'night'] as const) {
+      const cfg = defaultConfig();
+      cfg.display.darkMode.source = theme;
+      const loaded = JSON.parse(JSON.stringify(cfg));
+      cleanConfig(loaded, {});
+      expect(loaded.display.darkMode.source).toBe(theme);
+    }
+  });
+});

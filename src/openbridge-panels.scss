@@ -1,0 +1,83 @@
+/* OpenBridge surfaces and existing Material control adapters. */
+anchor-watch .anchorwatch {
+  box-sizing: border-box; padding: 12px; overflow-y: auto;
+  background: var(--fb-component); color: var(--fb-text);
+}
+anchor-watch mat-card {
+  background: var(--fb-component) !important; color: var(--fb-text);
+  border-radius: 8px; box-shadow: none !important;
+}
+anchor-watch .title-block {align-items:center;padding:0 0 8px !important;gap:8px;border-bottom:1px solid var(--fb-outline)}
+anchor-watch .title-block > div:first-child {width:48px !important;flex:none}
+anchor-watch .title-block > div:last-child {padding:0 !important;font-size:18px;font-weight:600}
+anchor-watch mat-card-content {padding:12px 0 !important}
+anchor-watch mat-card-content > div:first-child {font-size:12px;color:var(--fb-text-secondary);font-weight:400}
+anchor-watch .anchor-diagram {
+  position:relative;width:100% !important;height:180px !important;
+  background-image:none !important;background-color:var(--fb-section);
+  color:var(--fb-text) !important;border:1px solid var(--fb-outline);border-radius:8px;margin-top:8px;
+}
+anchor-watch .anchor-diagram svg {width:100%;height:100%;display:block}
+anchor-watch .radius-ring {stroke:var(--fb-text-secondary)}
+anchor-watch .anchor-diagram > b {position:absolute !important;top:36px !important;left:calc(50% + 10px) !important;width:auto !important;font-size:14px;font-weight:500;background:var(--fb-section);padding:2px 4px}
+anchor-watch .anchor-diagram[data-raised=true] .anchor-rode {display:none}
+anchor-watch .anchor-diagram[data-raised=true] .anchor-symbol {transform:translate(-5px,-37px)}
+anchor-watch mat-card-actions {padding:0 !important}
+anchor-watch mat-card-actions > div > div:first-child {display:flex;align-items:center;justify-content:center;gap:16px;min-height:52px;border-block:1px solid var(--fb-outline);margin-bottom:12px;font-size:13px;font-weight:600}
+anchor-watch mat-card-actions > div > div:not(:first-child) {align-items:center;gap:8px;min-height:80px}
+anchor-watch mat-card-actions > div > div:not(:first-child) > div {min-width:0}
+anchor-watch mat-form-field {width:120px;max-width:120px !important;font-size:13px}
+anchor-watch .mat-mdc-form-field-subscript-wrapper {font-size:11px}
+anchor-watch button[mat-raised-button] {border-radius:4px;min-height:40px;padding:0 10px !important;font-size:12px;white-space:nowrap}
+anchor-watch .mat-vertical-stepper-header {padding:16px 12px}
+anchor-watch .mat-vertical-content {padding:0 12px 16px 20px}
+anchor-watch mat-stepper {background:var(--fb-component) !important}
+ap-popover .popover:not(.measure) {font-family:inherit;background:var(--fb-component);color:var(--fb-text);border:1px solid var(--fb-outline);border-radius:8px;box-shadow:var(--shadow-floating,0 8px 24px #0006);padding:0}
+ap-popover .popover:not(.measure):not(.compact) > .popover-title {background:var(--fb-section);color:var(--fb-text);border-radius:8px 8px 0 0;padding:6px 12px;line-height:32px;border-bottom:1px solid var(--fb-outline);font-size:14px;font-weight:600;align-items:center}
+ap-popover .popover:not(.measure) .popover-content {padding:8px}
+ap-popover .popover-action-button {min-height:44px;border-radius:4px !important}
+info-panel {display:block;height:100%;background:var(--fb-component);color:var(--fb-text)}
+info-panel > div:first-child mat-nav-list {padding:4px 8px 0 !important}
+info-panel > div:nth-child(2) {box-sizing:border-box;padding:8px;width:100% !important;max-width:100%;overflow-x:hidden}
+info-panel h1,info-panel h2,info-panel h3 {font-family:inherit;font-size:16px;line-height:1.4;overflow-wrap:anywhere}
+info-panel table {width:100%;font-size:13px;border-collapse:collapse}
+info-panel th,info-panel td {padding:6px 4px;vertical-align:top;overflow-wrap:anywhere}
+info-panel button {border-radius:4px !important;min-height:40px}
+radar-panel {display:block;height:100%;box-sizing:border-box;padding:8px 4px}
+radar-panel > div > div:first-child {padding-bottom:12px;border-bottom:1px solid var(--fb-outline)}
+radar-panel mat-button-toggle-group {border-radius:4px !important}
+radar-panel mat-button-toggle {min-width:56px}
+radar-panel > div > div:last-child {padding:12px 0 !important}
+radar-panel .kvRow {padding:0 0 12px !important}
+radar-panel mat-form-field {width:100%;font-size:14px}
+radar-panel mat-slider {min-width:110px}
+/* Keep the fixed legacy content inside its drawer, rather than the viewport. */
+mat-sidenav:has(info-panel):not(:has(instrument-panel)) {width:min(300px, 100vw) !important}
+info-panel {position:relative}
+info-panel > div:nth-child(2) {position:absolute !important;left:0;right:0;width:auto !important}
+info-panel :is(note-panel,waypoint-panel) > div > div:first-child > div:first-child {gap:8px;padding:4px 4px 12px}
+info-panel :is(note-panel,waypoint-panel) > div > div:first-child > div:first-child > div:first-child {min-width:0;flex:1;overflow-wrap:anywhere}
+info-panel :is(note-panel,waypoint-panel) > div > div:first-child > div:first-child > div:last-child {flex:0 0 auto !important}
+info-panel :is(note-panel,waypoint-panel) > div > div:first-child > div:nth-child(3) > div {display:flex;flex-wrap:wrap;gap:4px;width:100%;font-size:0;padding:8px 0}
+info-panel :is(note-panel,waypoint-panel) > div > div:first-child > div:nth-child(3) button {flex:1 1 calc(50% - 8px);font-size:13px;justify-content:flex-start}
+info-panel :is(remark,.note-description) {padding:8px 4px !important;min-height:0;line-height:1.5}
+info-panel table {table-layout:fixed}
+info-panel th {text-align:left;font-weight:500;color:var(--fb-text-secondary)}
+info-panel tr + tr {border-top:1px solid var(--fb-outline)}
+radar-panel > div > div:first-child > div:nth-child(2) {align-items:center;gap:12px}
+radar-panel > div > div:first-child > div:nth-child(2) > div:first-child {flex:0 0 auto !important;padding:0 !important}
+radar-panel > div > div:first-child > div:nth-child(2) > div:last-child {min-width:0;flex:1 !important}
+radar-panel mat-slider {width:calc(100% - 16px) !important;margin-inline:8px}
+/* Material action buttons inherit the same semantic colors as OpenBridge controls. */
+:is(ap-popover, info-panel, anchor-watch) button.mat-mdc-button {
+  --mat-button-text-label-text-color: var(--fb-text);
+  --mat-button-text-disabled-label-text-color: var(--fb-disabled);
+  --mat-button-text-state-layer-color: var(--fb-text);
+  --mat-button-text-ripple-color: color-mix(in srgb, var(--fb-text) 12%, transparent);
+}
+:is(ap-popover, info-panel, anchor-watch) button.mat-mdc-button mat-icon {color:inherit}
+/* A tooltip must not intercept the adjacent symbol in the waypoint picker. */
+body:has(ap-waypointdialog) .cdk-overlay-popover:has(mat-tooltip-component),
+body:has(ap-waypointdialog) .cdk-overlay-popover:has(mat-tooltip-component) * {
+  pointer-events: none !important;
+}

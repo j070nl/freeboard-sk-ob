@@ -1,0 +1,210 @@
+:host {
+    display: block;
+    height: 100%;
+    min-height: 0;
+}
+
+.ob-resource-list {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+    color: var(--fb-text);
+    background: var(--fb-component);
+    font-family: 'Noto Sans', sans-serif;
+}
+
+.ob-resource-list .resource-header {
+    flex: 0 0 auto;
+    border-radius: 0;
+    border-bottom: 1px solid var(--fb-outline);
+    background: var(--fb-component);
+    box-shadow: none;
+}
+
+.ob-resource-list .title-block {
+    align-items: center;
+    padding: 4px 8px;
+}
+
+.resource-heading {
+    font: 500 18px/24px 'Noto Sans', sans-serif;
+}
+
+.ob-resource-list .resource-header mat-card-content {
+    padding: 0 8px 8px;
+}
+
+.resource-filter {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.resource-search {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.resource-search mat-form-field {
+    width: 100%;
+}
+
+.ob-resource-list .resources {
+    position: relative;
+    inset: auto;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.ob-resource-list .vscroller {
+    border: 0;
+}
+
+.ob-resource-list .resource-row {
+    box-sizing: border-box;
+    border-radius: 0;
+    border-bottom: 1px solid var(--fb-outline);
+    background: var(--fb-section);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.ob-resource-list .resource-row mat-card-content {
+    padding: 8px 8px 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.ob-resource-list .resource-details {
+    flex: 1 1 0;
+    min-width: 0;
+    line-height: 20px;
+}
+
+.ob-resource-list mat-card-actions {
+    padding: 0 8px;
+    min-height: 48px;
+    flex-shrink: 0;
+}
+
+/* Flatten legacy grouping wrappers so every action gets an equal touch target. */
+.ob-resource-list .resource-row mat-card-actions > div {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.ob-resource-list .resource-row mat-card-actions > div > div {
+    display: contents;
+}
+
+.ob-resource-list obc-icon-button {
+    display: inline-flex;
+    flex: 0 0 48px;
+    width: 48px;
+    height: 48px;
+}
+
+.routes-list .resource-row {
+    height: 160px;
+}
+
+.waypoints-list .resource-row {
+    height: 104px;
+}
+
+.charts-list .resource-header mat-card-actions {
+    justify-content: space-between;
+}
+
+.ob-resource-list .resources.charts .stack-caption {
+    background: var(--fb-component);
+    color: var(--fb-text-secondary);
+    border-color: var(--fb-outline);
+    border-style: solid;
+    font-size: 11px;
+}
+
+.ob-resource-list .chart-drop-placeholder {
+    background: var(--fb-selected);
+    border: 2px dashed var(--fb-outline-selected);
+}
+
+.ob-resource-list .resources.charts {
+    top: auto;
+}
+
+.resource-filter > div:not(.resource-search) {
+    flex: 0 0 48px;
+    width: 48px;
+}
+
+.ob-resource-list .resources.vessels,
+.ob-resource-list .resources.vessels.buddies {
+    top: auto;
+    overflow-y: auto;
+}
+
+.vessels-list .resource-row {
+    height: 104px;
+}
+
+.vessels-list .vessel-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    cursor: pointer;
+    color: var(--fb-text);
+}
+
+.vessel-name mat-icon {
+    flex-shrink: 0;
+}
+
+.vessel-name b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vessel-name:focus-visible {
+    outline: 2px solid var(--fb-focus);
+    outline-offset: -2px;
+}
+
+.ob-resource-list .vessel-filter,
+.ob-resource-list .vessel-filter.stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 0 8px 8px;
+}
+
+.ob-resource-list .vessel-filter .filter-toggles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.vessels-list .vessel-types {
+    background: var(--fb-section);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.vessel-types mat-card-content {
+    padding: 8px;
+}
+
+.vessel-types mat-card-content > div {
+    min-height: 48px;
+    align-items: center;
+}

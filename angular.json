@@ -38,9 +38,12 @@
               }
             ],
             "styles": [
+              "node_modules/@oicl/openbridge-webcomponents/dist/openbridge.css",
               "src/app-theme.scss",
               "src/styles.scss",
-              "node_modules/@kolkov/angular-editor/themes/default.scss"
+              "node_modules/@kolkov/angular-editor/themes/default.scss",
+              "src/openbridge-theme.scss",
+              "src/openbridge-panels.scss"
             ],
             "scripts": [],
             "extractLicenses": false,

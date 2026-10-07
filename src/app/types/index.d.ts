@@ -1,3 +1,4 @@
+import { ThemePreference } from '../lib/theme/theme';
 // ** Resource Types **
 
 import { Position, LineString, MultiLineString } from './resources/geojson';
@@ -106,7 +107,7 @@ export interface IAppConfig {
   display: {
     fab: MFBAction; // FAB button selection
     disableWakelock: boolean;
-    darkMode: { enabled: boolean; source: 0 | 1 | -1 }; // source: 0= browser default, 1= Signal K mode, -1=manual)
+    darkMode: { enabled: boolean; source: ThemePreference };
     nightMode: boolean; // auto set night mode based on environment.mode
     muteSound: boolean;
     depthAlarm: { enabled: boolean; smoothing: number };

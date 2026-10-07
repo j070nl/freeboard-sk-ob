@@ -23,6 +23,7 @@ import { MapImageRegistry } from '../map-image-registry.service';
   standalone: false
 })
 export class FreeboardWaypointLayerComponent extends FBFeatureLayerComponent {
+  protected override labelFont = '12px sans-serif';
   @Input() waypointStyles: { [key: string]: Style };
   @Input() activeWaypoint: string;
   @Input() waypoints: FBWaypoints = [];

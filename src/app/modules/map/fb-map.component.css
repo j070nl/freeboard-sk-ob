@@ -13,13 +13,37 @@
 
 .ol-mouse-position {
     width: 100%;
+    box-sizing: border-box;
     top: unset;
-    bottom: 10px; 
-    left: unset; 
-    right:unset; 
+    bottom: 8px;
+    left: 0;
+    right: unset;
+    padding-inline: 8px;
     text-align: center;
-    color: rgb(30,30,30);
-    font-family: roboto; 
+    pointer-events: none;
+}
+
+.map-status-bar {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    gap: 4px 16px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: 1px solid var(--fb-outline);
+    border-radius: 4px;
+    background: var(--fb-component);
+    color: var(--fb-text);
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 12px;
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+.map-status-field {
+    white-space: nowrap;
 }
 
 .ol-zoom {

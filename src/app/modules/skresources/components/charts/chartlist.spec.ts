@@ -380,7 +380,9 @@ describe('ChartListComponent — Time control on temporal rows', () => {
 
   const timeButtons = (fixture: { nativeElement: unknown }) =>
     Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+        'obc-icon-button'
+      )
     ).filter((b) => b.textContent?.includes('schedule'));
 
   beforeEach(() => {

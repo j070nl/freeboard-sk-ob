@@ -1,24 +1,25 @@
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { OpenBridgeControlDirective } from './openbridge/control.directive';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-waypoint-add-iec.js';
 import { Component, inject, input } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SKResourceService } from 'src/app/modules';
 import { Position } from 'src/app/types';
 
 @Component({
   selector: 'wpt-button',
-  imports: [MatIconModule, MatButtonModule, MatTooltipModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  imports: [OpenBridgeControlDirective, MatTooltipModule],
   template: `
-    <button
-      class="button-toolbar"
-      mat-fab
+    <obc-icon-button
+      aria-label="Mark Vessel Position"
       [disabled]="!active()"
       (click)="dropWaypoint()"
       matTooltip="Mark Vessel Position"
       matTooltipPosition="above"
     >
-      <mat-icon>add_location</mat-icon>
-    </button>
+      <obi-waypoint-add-iec></obi-waypoint-add-iec>
+    </obc-icon-button>
   `,
   styles: []
 })

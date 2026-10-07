@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true
+  },
+  "files": [
+    "src/app/lib/theme/theme.ts",
+    "src/app/lib/theme/theme.service.ts",
+    "src/app/lib/components/openbridge/control.directive.ts",
+    "src/app/lib/components/openbridge/checkbox.component.ts",
+    "src/app/lib/components/openbridge/slider.component.ts",
+    "src/app/lib/components/openbridge/select.component.ts"
+  ],
+  "include": []
+}

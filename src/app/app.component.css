@@ -76,7 +76,7 @@ mat-nav-list {
     width:50px; 
     z-index: 4800;
     position: absolute;
-    padding: 5px 2px 2px 2px;
+    padding: 1px 2px 2px 2px;
     overflow: auto;
     scrollbar-width: none;
 }
@@ -84,13 +84,13 @@ mat-nav-list {
 .buttonPanel.rightTop { 
     right: 0px;
     top: 0px;
-    padding: 9px 2px 10px 2px;
+    padding: 5px 2px 10px 2px;
 }
 
 .buttonPanel.leftTop { 
     left: 0px;
     top: 0px;
-    padding: 9px 2px 10px 2px;
+    padding: 5px 2px 10px 2px;
 }
 
 .buttonPanel.left { 

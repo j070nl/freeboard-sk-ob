@@ -1,24 +1,23 @@
-<div class="resourcelist">
-  <mat-card style="border-radius: unset">
+<div class="resourcelist ob-resource-list vessels-list">
+  <mat-card class="resource-header">
     <mat-card-title>
       <div class="title-block">
         <div style="width: 50px">
-          <button
-            mat-icon-button
+          <obc-icon-button
             (click)="close()"
             matTooltip="Close Vessels List"
             matTooltipPosition="right"
+            aria-label="Close Vessels List"
+            ><mat-icon>arrow_back</mat-icon></obc-icon-button
           >
-            <mat-icon>arrow_back</mat-icon>
-          </button>
         </div>
-        <div style="flex: 1 1 auto; padding-top: 7px">Vessels</div>
+        <div class="resource-heading">Vessels</div>
       </div>
     </mat-card-title>
     <mat-card-content>
-      <div style="display: flex">
-        <div style="flex: 1 1 auto; padding-left: 3px">
-          <mat-form-field floatLabel="always" style="width: 180px">
+      <div class="resource-filter">
+        <div class="resource-search">
+          <mat-form-field floatLabel="always" subscriptSizing="dynamic">
             <mat-label>Type to filter list</mat-label>
             <input
               #ftext
@@ -29,22 +28,24 @@
               (keyup)="filterKeyUp(ftext.value)"
             />
             @if(filterText) {
-            <button matSuffix mat-icon-button (click)="filterKeyUp('')">
-              <mat-icon>close</mat-icon>
-            </button>
+            <obc-icon-button
+              matSuffix
+              (click)="filterKeyUp('')"
+              aria-label="Clear filter"
+              ><mat-icon>close</mat-icon></obc-icon-button
+            >
             }
           </mat-form-field>
         </div>
         <div>
-          <button
-            mat-icon-button
+          <obc-icon-button
             (click)="initItems()"
             matTooltip="Reload Vessels"
             matTooltipPosition="below"
             [disabled]="app.config.selections.aisFilterByShipType"
+            aria-label="Reload Vessels"
+            ><mat-icon>refresh</mat-icon></obc-icon-button
           >
-            <mat-icon>refresh</mat-icon>
-          </button>
         </div>
         <div>
           <mat-checkbox
@@ -94,7 +95,7 @@
     @if(this.app.sIsFetching()) {
     <mat-progress-bar mode="query"></mat-progress-bar>
     } @if (app.config.selections.aisFilterByShipType) {
-    <mat-card>
+    <mat-card class="vessel-types">
       <mat-card-content>
         @for (i of shipTypes; track i.id) {
         <div style="display: flex">
@@ -124,16 +125,20 @@
     </mat-card>
 
     } @else {
-    <cdk-virtual-scroll-viewport class="vscroller" itemSize="48">
+    <cdk-virtual-scroll-viewport class="vscroller" itemSize="104">
       <mat-card
         *cdkVirtualFor="let r of filteredList(); let i= index;"
-        style="border-bottom: silver 1px outset; border-radius: unset"
+        class="resource-row"
       >
         <mat-card-content>
           <div style="display: flex">
-            <div style="flex: 1 1 auto; padding-left: 7px">
+            <div class="resource-details">
               <a
-                style="cursor: pointer"
+                class="vessel-name"
+                tabindex="0"
+                role="button"
+                (keydown.enter)="itemProperties(r[0])"
+                (keydown.space)="$event.preventDefault(); itemProperties(r[0])"
                 (click)="itemProperties(r[0])"
                 matTooltip="Vessel Properties"
                 matTooltipPosition="right"
@@ -160,34 +165,28 @@
           <div style="display: flex; flex-wrap: wrap">
             <div style="flex: 1 1 auto">
               @if(r[0] !== focusId()) {
-              <button
-                mat-button
+              <obc-icon-button
                 (click)="focus(r[0])"
                 matTooltip="Focus vessel"
+                aria-label="Focus vessel"
+                ><mat-icon>center_focus_weak</mat-icon></obc-icon-button
               >
-                <mat-icon>center_focus_weak</mat-icon>
-                FOCUS
-              </button>
               } @else {
-              <button
-                mat-button
+              <obc-icon-button
                 (click)="focus();"
                 matTooltip="Clear vessel focus"
+                aria-label="Clear vessel focus"
+                ><mat-icon>clear_all</mat-icon></obc-icon-button
               >
-                <mat-icon>clear_all</mat-icon>
-                UNFOCUS
-              </button>
               }
             </div>
-            <button
-              mat-button
+            <obc-icon-button
               [disabled]="app.uiConfig().mapMove"
               (click)="emitCenter(r[1].position)"
               matTooltip="Center Vessel"
+              aria-label="Center Vessel"
+              ><mat-icon>center_focus_strong</mat-icon></obc-icon-button
             >
-              <mat-icon>center_focus_strong</mat-icon>
-              CENTER
-            </button>
             @let trackShown = app.isVesselTrackShown(r[0]);
             <span
               [matTooltip]="
@@ -198,14 +197,14 @@
                     : 'Show vessel track'
               "
             >
-              <button
-                mat-button
+              <obc-icon-button
                 (click)="app.toggleVesselTrack(r[0])"
                 [disabled]="app.config.vessels.aisShowTrack"
+                [ariaLabel]="trackShown ? 'Hide vessel track' : 'Show vessel track'"
+                ><mat-icon
+                  >{{ trackShown ? 'layers_clear' : 'route' }}</mat-icon
+                ></obc-icon-button
               >
-                <mat-icon>{{ trackShown ? 'layers_clear' : 'route' }}</mat-icon>
-                {{ trackShown ? 'UNTRACK' : 'TRACK' }}
-              </button>
             </span>
             @if (trackHistory.available()) { @let historyShown =
             trackHistory.isShown(r[0]); @let noHistory =
@@ -219,27 +218,24 @@
                       : 'Show track history'
                 "
             >
-              <button
-                mat-button
+              <obc-icon-button
                 (click)="trackHistory.toggle(r[0])"
                 [disabled]="noHistory && !historyShown"
-              >
-                <mat-icon
+                [ariaLabel]="historyShown ? 'Hide track history' : 'Show track history'"
+                ><mat-icon
                   >{{ historyShown ? 'history_toggle_off' : 'history'
                   }}</mat-icon
-                >
-                HISTORY
-              </button>
+                ></obc-icon-button
+              >
             </span>
             }
             <div>
-              <button
-                mat-icon-button
+              <obc-icon-button
                 (click)="itemProperties(r[0])"
                 matTooltip="Vessel Properties"
+                aria-label="Vessel Properties"
+                ><mat-icon>info_outline</mat-icon></obc-icon-button
               >
-                <mat-icon>info_outline</mat-icon>
-              </button>
             </div>
           </div>
         </mat-card-actions>

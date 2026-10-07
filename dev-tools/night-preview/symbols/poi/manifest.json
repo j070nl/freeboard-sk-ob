@@ -1,0 +1,146 @@
+{
+  "anchorage.svg": {
+    "source": "OpenBridge anchor-iec",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "boatramp.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "bridge.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "business.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "dam.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "dock.svg": {
+    "source": "OpenBridge harbour-berthing",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "ferry.svg": {
+    "source": "OpenBridge ship-carferry",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "fuel.svg": {
+    "source": "OpenBridge energy-petrol",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "inlet.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "lock.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "marina.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "navigation-structure.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "notice-to-mariners.svg": {
+    "source": "OpenBridge info",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "radio-call-point.svg": {
+    "source": "OpenBridge com-radio",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "transhipment-dock.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "tunnel.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "turning-basin.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  },
+  "waterway-guage.svg": {
+    "source": "Original Freeboard geometry; subdued POI palette",
+    "anchor": [
+      1,
+      37
+    ],
+    "scale": 0.65
+  }
+}

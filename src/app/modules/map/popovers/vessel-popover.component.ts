@@ -350,12 +350,7 @@ export class VesselPopoverComponent {
         this.vessel().callsignVhf ??
         this.vessel().callsignHf ??
         'Vessel:';
-      this._icon = this.vessel().type?.id
-        ? getAisIcon(this.vessel().type?.id)
-        : {
-            name: 'directions_boat',
-            svgIcon: undefined
-          };
+      this._icon = getAisIcon(this.vessel().type?.id);
       this.position = [this.vessel().position[0], this.vessel().position[1]];
       this.position = GeoUtils.normaliseCoords(this.position);
       if (this.vessel().positionTimestamp) {

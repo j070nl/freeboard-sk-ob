@@ -71,25 +71,22 @@
   <ol-control>
     <ol-content>
       <div class="ol-zoom">
-        <button
-          class="button-accent"
-          mat-mini-fab
+        <obc-icon-button
           (click)="zoomMap(false)"
           [disabled]="mapZoomLevel() <= app.MAP_ZOOM_EXTENT.min"
           matTooltip="Zoom out"
+          aria-label="Zoom out"
         >
           <mat-icon>remove</mat-icon>
-        </button>
-        &nbsp;
-        <button
-          class="button-accent"
-          mat-mini-fab
+        </obc-icon-button>
+        <obc-icon-button
           (click)="zoomMap(true)"
           [disabled]="mapZoomLevel() >= app.MAP_ZOOM_EXTENT.max"
           matTooltip="Zoom in"
+          aria-label="Zoom in"
         >
           <mat-icon>add</mat-icon>
-        </button>
+        </obc-icon-button>
       </div>
     </ol-content>
   </ol-control>
@@ -105,35 +102,36 @@
             : null
         "
       >
-        <span
-          style="
-            background-color: rgba(250, 250, 250, 0.7);
-            padding: 0 5px 0 5px;
-          "
-        >
-          @if (app.config.units.positionFormat === 'XY') {
-            <span>Lat:&nbsp;</span>
-          }
-          <span
-            [innerText]="
-              mouse().coords[1] | coords: app.config.units.positionFormat : true
-            "
-          ></span>
-          &nbsp;
-          @if (app.config.units.positionFormat === 'XY') {
-            <span>Lon:&nbsp;</span>
-          }
-
-          <span
-            [innerText]="
-              mouse().coords[0] | coords: app.config.units.positionFormat
-            "
-          ></span>
-          &nbsp;
-          <span [innerText]="'Zm: ' + mapZoomText()"></span>
-          @if (cursorInfo(); as ci) {
-            &nbsp;
+        <span class="map-status-bar">
+          <span class="map-status-field">
+            @if (app.config.units.positionFormat === 'XY') {
+              <span>Lat:&nbsp;</span>
+            }
             <span
+              [innerText]="
+                mouse().coords[1]
+                  | coords: app.config.units.positionFormat : true
+              "
+            ></span>
+          </span>
+          <span class="map-status-field">
+            @if (app.config.units.positionFormat === 'XY') {
+              <span>Lon:&nbsp;</span>
+            }
+
+            <span
+              [innerText]="
+                mouse().coords[0] | coords: app.config.units.positionFormat
+              "
+            ></span>
+          </span>
+          <span
+            class="map-status-field"
+            [innerText]="'Zm: ' + mapZoomText()"
+          ></span>
+          @if (cursorInfo(); as ci) {
+            <span
+              class="map-status-field"
               [innerText]="
                 'Brg: ' +
                 app.formatValueForDisplay(ci.bearing, 'deg', {
@@ -141,15 +139,15 @@
                 })
               "
             ></span>
-            &nbsp;
             <span
+              class="map-status-field"
               [innerText]="
                 'Dist: ' + app.formatValueForDisplay(ci.distance, 'm')
               "
             ></span>
             @if (ci.timeToGo !== null) {
-              &nbsp;
               <span
+                class="map-status-field"
                 [innerText]="
                   'ETA: ' + app.formatValueForDisplay(ci.timeToGo, 's')
                 "

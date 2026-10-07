@@ -1,24 +1,24 @@
-<div class="resourcelist">
-  <mat-card style="border-radius: unset">
+<div class="resourcelist ob-resource-list waypoints-list">
+  <mat-card class="resource-header">
     <mat-card-title>
       <div class="title-block">
         <div style="width: 50px">
-          <button
-            mat-icon-button
+          <obc-icon-button
             (click)="close()"
             matTooltip="Close Waypoint List"
             matTooltipPosition="right"
+            aria-label="Close Waypoint List"
           >
             <mat-icon>arrow_back</mat-icon>
-          </button>
+          </obc-icon-button>
         </div>
-        <div style="flex: 1 1 auto; padding-top: 7px">Waypoints</div>
+        <div class="resource-heading">Waypoints</div>
       </div>
     </mat-card-title>
     <mat-card-content>
-      <div style="display: flex">
-        <div style="flex: 1 1 auto; padding-left: 3px">
-          <mat-form-field floatLabel="always" style="width: 180px">
+      <div class="resource-filter">
+        <div class="resource-search">
+          <mat-form-field floatLabel="always" subscriptSizing="dynamic">
             <mat-label>Type to filter list</mat-label>
             <input
               #ftext
@@ -28,22 +28,26 @@
               (keyup)="filterKeyUp(ftext.value)"
             />
             @if(filterText) {
-            <button matSuffix mat-icon-button (click)="filterKeyUp('')">
+            <obc-icon-button
+              matSuffix
+              (click)="filterKeyUp('')"
+              aria-label="Clear filter"
+            >
               <mat-icon>close</mat-icon>
-            </button>
+            </obc-icon-button>
             }
           </mat-form-field>
         </div>
         <div>
-          <button
-            mat-icon-button
+          <obc-icon-button
             [disabled]="disableRefresh"
             (click)="initItems()"
             matTooltip="Reload Waypoints"
             matTooltipPosition="below"
+            aria-label="Reload Waypoints"
           >
             <mat-icon>refresh</mat-icon>
-          </button>
+          </obc-icon-button>
         </div>
         <div>
           <mat-checkbox
@@ -65,14 +69,14 @@
     @if(this.app.sIsFetching()) {
     <mat-progress-bar mode="query"></mat-progress-bar>
     }
-    <cdk-virtual-scroll-viewport class="vscroller" itemSize="90">
+    <cdk-virtual-scroll-viewport class="vscroller" itemSize="104">
       <mat-card
         *cdkVirtualFor="let r of filteredList(); let i= index;"
-        style="border-bottom: silver 1px outset; border-radius: unset"
+        class="resource-row"
       >
         <mat-card-content>
           <div style="display: flex; padding-left: 5px">
-            <div style="flex: 1 1 auto; width: 215px">
+            <div class="resource-details">
               <div
                 style="
                   text-overflow: ellipsis;
@@ -101,79 +105,79 @@
         <mat-card-actions>
           <div style="display: flex">
             <div>
-              <button
-                mat-icon-button
+              <obc-icon-button
                 [disabled]="r[0] === activeWaypoint() || disableRefresh"
                 (click)="itemDelete(r[0])"
                 matTooltip="Delete Waypoint"
                 matTooltipPosition="above"
+                aria-label="Delete Waypoint"
               >
                 <mat-icon>delete</mat-icon>
-              </button>
+              </obc-icon-button>
             </div>
-            <button
-              mat-icon-button
+            <obc-icon-button
               (click)="itemViewNotes(r)"
               matTooltip="Waypoint notes"
               matTooltipPosition="above"
+              aria-label="Waypoint notes"
             >
               <mat-icon>local_offer</mat-icon>
-            </button>
+            </obc-icon-button>
             <div style="flex: 1 1 auto; text-align: center">
               @if(!activeWaypoint() || activeWaypoint() !== r[0]) {
-              <button
-                mat-icon-button
+              <obc-icon-button
                 [disabled]="disableRefresh"
                 (click)="itemGoTo(r[0])"
                 matTooltip="Navigate to Waypoint"
                 matTooltipPosition="above"
+                aria-label="Navigate to Waypoint"
               >
                 <mat-icon>near_me</mat-icon>
-              </button>
+              </obc-icon-button>
               } @if(activeWaypoint() === r[0]) {
-              <button
-                mat-icon-button
+              <obc-icon-button
                 [disabled]="disableRefresh"
                 (click)="itemClearActive()"
                 matTooltip="Stop Navigating"
                 matTooltipPosition="above"
+                aria-label="Stop Navigating"
               >
                 <mat-icon>clear_all</mat-icon>
-              </button>
+              </obc-icon-button>
               }
             </div>
             <div>
-              <button
-                mat-icon-button
+              <obc-icon-button
                 [disabled]="app.uiConfig().mapMove || !r[2]"
                 (click)="emitCenter(r[1].feature.geometry.coordinates)"
                 matTooltip="Center Waypoint"
                 matTooltipPosition="above"
+                aria-label="Center Waypoint"
               >
                 <mat-icon>center_focus_strong</mat-icon>
-              </button>
+              </obc-icon-button>
               @if(app.featureFlags().resourceGroups) {
-              <button
-                mat-icon-button
+              <obc-icon-button
                 [disabled]="disableRefresh"
                 (click)="itemAddToGroup(r[0])"
                 matTooltip="Add to Group"
                 matTooltipPosition="above"
+                aria-label="Add to Group"
               >
                 <mat-icon>category</mat-icon>
-              </button>
+              </obc-icon-button>
               }
             </div>
             <div>
-              <button
-                mat-icon-button
+              <obc-icon-button
                 [disabled]="disableRefresh"
                 (click)="itemProperties(r[0])"
                 matTooltip="Waypoint Properties"
                 matTooltipPosition="above"
+                aria-label="Waypoint Properties"
               >
                 <mat-icon>info_outline</mat-icon>
-              </button>
+              </obc-icon-button>
             </div>
           </div>
         </mat-card-actions>

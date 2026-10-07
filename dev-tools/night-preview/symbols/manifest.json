@@ -1,0 +1,30 @@
+{
+  "vessels/ais_self.svg": {
+    "source": "own-ship-iec",
+    "width": 19,
+    "height": 45,
+    "transform": "translate(9.5 22.5) scale(1.4) translate(-12 -12)",
+    "colors": [
+      "#2687ff"
+    ]
+  },
+  "vessels/ais_active.svg": {
+    "source": "ais-target-activated-filled",
+    "width": 32,
+    "height": 32,
+    "transform": "translate(17 16) scale(1.2) translate(-12 -12)",
+    "colors": [
+      "#ff00ff",
+      "#111111"
+    ]
+  },
+  "waypoints/waypoint.svg": {
+    "source": "waypoint-optional-iec",
+    "width": 24,
+    "height": 36,
+    "transform": "translate(12 24) scale(1.5) translate(-12 -12)",
+    "colors": [
+      "#ff9955"
+    ]
+  }
+}

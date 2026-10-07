@@ -72,7 +72,6 @@ export class AnchorWatchComponent {
 
   @ViewChild('slideCtl', { static: true }) slideCtl: ElementRef<MatSlideToggle>;
 
-  protected bgImage: string;
   protected sliderValue: number;
   protected rodeOut = false;
   protected convert = Convert;
@@ -95,7 +94,7 @@ export class AnchorWatchComponent {
     if (!Number.isFinite(this.radiusValue()) || this.raised) {
       return '--';
     } else {
-      return `${Math.round(this.radiusValue())}${Convert.getSymbol(this.app.config.units.length)}`;
+      return this.app.formatValueForDisplay(this.radius, 'm');
     }
   });
   protected displayRadius = signal<string>('--');
@@ -133,11 +132,6 @@ export class AnchorWatchComponent {
       );
     }
 
-    this.bgImage = `url('${
-      this.raised
-        ? './assets/img/anchor-radius-raised.png'
-        : './assets/img/anchor-radius.png'
-    }')`;
     this.rodeOut = !this.raised && this.radius !== -1;
     this.disableRaiseDrop =
       !this.showSelf || (this.raised && this.useSetManual);

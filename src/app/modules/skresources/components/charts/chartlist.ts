@@ -1,5 +1,7 @@
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
 import {
   Component,
+  CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   effect,
   signal,
@@ -55,8 +57,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   selector: 'chart-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chartlist.html',
-  styleUrls: ['../resourcelist.css'],
+  styleUrls: ['../resourcelist.css', '../resource-panels.css'],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
+    OpenBridgeControlDirective,
     MatTooltipModule,
     MatIconModule,
     MatCardModule,

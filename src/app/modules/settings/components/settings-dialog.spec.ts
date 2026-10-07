@@ -32,8 +32,8 @@ const NOTE_DETAILS_LABEL = 'Single Click for Note Details';
 
 /** Checkboxes under `root` carrying the given visible label. */
 const checkboxesByLabel = (root: ParentNode, label: string) =>
-  Array.from(root.querySelectorAll('mat-checkbox')).filter((b) =>
-    (b.textContent ?? '').includes(label)
+  Array.from(root.querySelectorAll('fb-checkbox')).filter((b) =>
+    (b.getAttribute('label') ?? '').includes(label)
   );
 
 describe('settings dialog — note details option placement', () => {
@@ -73,6 +73,7 @@ describe('settings dialog — note details option placement', () => {
 
     const appStub = {
       config: settings,
+      formatValueForDisplay: (value: number) => `${Math.round(value * 100)}%`,
       trackSource,
       serverTrailWanted: () =>
         resolveTrailSource(settings.vessels.trailSource, trackSource()) ===
@@ -130,14 +131,15 @@ describe('settings dialog — note details option placement', () => {
     await selectTab('Resources');
 
     const notes = dialog.querySelector('#sectNotes') as HTMLElement;
-    const input = checkboxesByLabel(notes, NOTE_DETAILS_LABEL)[0].querySelector(
-      'input'
-    ) as HTMLInputElement;
+    const input = checkboxesByLabel(notes, NOTE_DETAILS_LABEL)[0]
+      .querySelector('obc-checkbox-item')
+      ?.shadowRoot?.querySelector<HTMLElement>('.checkbox-item-container');
+    expect(input).toBeTruthy();
 
     expect(settings.display.singleClickNoteDetails).toBe(false);
     const before = applied;
 
-    input.click();
+    input?.click();
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -180,7 +182,7 @@ describe('settings dialog — note details option placement', () => {
 
     it('names the all-targets option "Show all tracks"', async () => {
       await selectTab('Vessels');
-      expect(text()).toContain('Show all tracks');
+      expect(checkboxesByLabel(dialog, 'Show all tracks')).toHaveLength(1);
     });
 
     it('offers the picked vessel track length only while all tracks are off', async () => {
@@ -188,10 +190,11 @@ describe('settings dialog — note details option placement', () => {
       await selectTab('Vessels');
       expect(text()).toContain('Picked vessel track length (12 hrs)');
 
-      const showAll = Array.from(
-        dialog.querySelectorAll<HTMLElement>('mat-checkbox')
-      ).find((c) => (c.textContent ?? '').includes('Show all tracks'));
-      showAll?.querySelector<HTMLInputElement>('input')?.click();
+      const showAll = checkboxesByLabel(dialog, 'Show all tracks')[0]
+        .querySelector('obc-checkbox-item')
+        ?.shadowRoot?.querySelector<HTMLElement>('.checkbox-item-container');
+      expect(showAll).toBeTruthy();
+      showAll?.click();
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();

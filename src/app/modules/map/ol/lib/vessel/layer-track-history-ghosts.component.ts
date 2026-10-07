@@ -51,7 +51,11 @@ export class TrackHistoryGhostLayerComponent
 
   ngOnInit() {
     this.source = new VectorSource({ features: this.buildFeatures() });
-    this.layer = new VectorLayer({ source: this.source, zIndex: this.zIndex });
+    this.layer = new VectorLayer({
+      className: 'ol-layer fb-symbol-layer',
+      source: this.source,
+      zIndex: this.zIndex
+    });
     this.mapComponent.getMap()?.addLayer(this.layer);
   }
 

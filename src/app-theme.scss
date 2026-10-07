@@ -319,3 +319,9 @@ html {
     }
   }
 }
+
+// The central palette lives on html, including detached CDK overlays.
+html.dark-theme {
+    @include mat.all-component-colors($dark-theme);
+    @include mat.color-variants-backwards-compatibility($dark-theme);
+}

@@ -1,8 +1,10 @@
+import { OpenBridgeControlDirective } from '../openbridge/control.directive';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import '@oicl/openbridge-webcomponents/dist/components/button/button.js';
+import { OpenBridgeCheckboxComponent } from '../openbridge/checkbox.component';
 import { Component, OnInit, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
   MatDialogModule,
   MatDialogRef,
@@ -14,8 +16,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MAT_SNACK_BAR_DATA } from '@angular/material/snack-bar';
 
 @Component({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   selector: 'ap-msgbox',
-  imports: [MatDialogModule, MatButtonModule],
+  imports: [OpenBridgeControlDirective, MatDialogModule, MatButtonModule],
   template: `
     <div class="_ap-msgbox">
       <div>
@@ -29,16 +32,16 @@ import { MAT_SNACK_BAR_DATA } from '@angular/material/snack-bar';
         }
       </mat-dialog-content>
       <mat-dialog-actions align="center">
-        <button mat-raised-button (click)="dialogRef.close(true)">
+        <obc-button (click)="dialogRef.close(true)">
           {{ data.buttonText }}
-        </button>
+        </obc-button>
       </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
       ._ap-msgbox {
-        font-family: Roboto;
+        font-family: inherit;
         min-width: 150px;
       }
     `
@@ -63,13 +66,20 @@ export class MsgBox implements OnInit {
 }
 
 @Component({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   selector: 'ap-alertdialog',
-  imports: [MatDialogModule, MatIconModule, MatCheckboxModule, MatButtonModule],
+  imports: [
+    OpenBridgeControlDirective,
+    MatDialogModule,
+    MatIconModule,
+    OpenBridgeCheckboxComponent,
+    MatButtonModule
+  ],
   template: `
     <div class="_ap-alert">
       <div>
         <h1 mat-dialog-title>
-          <mat-icon style="color: orange;">warning</mat-icon>
+          <mat-icon style="color: var(--fb-warning);">warning</mat-icon>
           &nbsp;{{ data.title }}
         </h1>
       </div>
@@ -85,19 +95,19 @@ export class MsgBox implements OnInit {
         </div>
         @if (data.checkText) {
           <div style="padding: 10px 0 0 10px;">
-            <mat-checkbox (change)="checked = $event.checked">
-              {{ data.checkText }}
-            </mat-checkbox>
+            <fb-checkbox
+              (change)="checked = $event.checked"
+              [label]="data.checkText"
+            ></fb-checkbox>
           </div>
         }
       </mat-dialog-content>
       <mat-dialog-actions align="center">
-        <button
-          mat-raised-button
+        <obc-button
           (click)="dialogRef.close(data.checkText ? { checked } : true)"
         >
           {{ data.buttonText }}
-        </button>
+        </obc-button>
       </mat-dialog-actions>
     </div>
   `,
@@ -131,13 +141,20 @@ export class AlertDialog implements OnInit {
 }
 
 @Component({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   selector: 'ap-confirmdialog',
-  imports: [MatDialogModule, MatIconModule, MatCheckboxModule, MatButtonModule],
+  imports: [
+    OpenBridgeControlDirective,
+    MatDialogModule,
+    MatIconModule,
+    OpenBridgeCheckboxComponent,
+    MatButtonModule
+  ],
   template: `
     <div class="_ap-confirm">
       <div>
         <h1 mat-dialog-title>
-          <mat-icon style="color:orange;">help</mat-icon>
+          <mat-icon style="color:var(--fb-warning);">help</mat-icon>
           &nbsp;{{ data.title }}
         </h1>
       </div>
@@ -155,31 +172,29 @@ export class AlertDialog implements OnInit {
           @if (data.checkText) {
             <div style="padding-left: 10px;">
               <div style="font-weight: 500;">
-                <mat-checkbox (change)="checked = $event.checked">
-                  {{ data.checkText }}&nbsp;
-                </mat-checkbox>
+                <fb-checkbox
+                  (change)="checked = $event.checked"
+                  [label]="data.checkText"
+                ></fb-checkbox>
               </div>
             </div>
           }
         </div>
       </mat-dialog-content>
       <mat-dialog-actions align="center">
-        <button
-          mat-raised-button
-          (click)="dialogRef.close({ ok: true, checked: checked })"
-        >
+        <obc-button (click)="dialogRef.close({ ok: true, checked: checked })">
           {{ data.button1Text }}
-        </button>
-        <button mat-raised-button (click)="dialogRef.close(null)">
+        </obc-button>
+        <obc-button (click)="dialogRef.close(null)">
           {{ data.button2Text }}
-        </button>
+        </obc-button>
       </mat-dialog-actions>
     </div>
   `,
   styles: [
     `
       ._ap-confirm {
-        font-family: Roboto;
+        font-family: inherit;
         min-width: 150px;
       }
     `
@@ -208,8 +223,14 @@ export class ConfirmDialog implements OnInit {
 }
 
 @Component({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   selector: 'ap-about-dialog',
-  imports: [MatDialogModule, MatIconModule, MatButtonModule],
+  imports: [
+    OpenBridgeControlDirective,
+    MatDialogModule,
+    MatIconModule,
+    MatButtonModule
+  ],
   template: `
     <div>
       <h1 mat-dialog-title><mat-icon>info</mat-icon>&nbsp;About</h1>
@@ -235,9 +256,7 @@ export class ConfirmDialog implements OnInit {
           >
           &nbsp;
         }
-        <button mat-raised-button (click)="dialogRef.close(false)">
-          Close
-        </button>
+        <obc-button (click)="dialogRef.close(false)"> Close </obc-button>
       </mat-dialog-actions>
     </div>
   `,
@@ -249,7 +268,7 @@ export class ConfirmDialog implements OnInit {
         flex-wrap: nowrap;
         justify-content: flex-start;
         align-content: stretch;
-        font-family: roboto;
+        font-family: inherit;
       }
       .about-row .item {
         padding-left: 10px;
@@ -277,67 +296,61 @@ export class AboutDialog {
 }
 
 @Component({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   selector: 'ap-login-dialog',
   imports: [
+    OpenBridgeControlDirective,
     MatDialogModule,
     MatIconModule,
     MatButtonModule,
-    MatCardModule,
     MatFormFieldModule,
     MatInputModule,
     FormsModule
   ],
   styles: [],
   template: `
+    <h2 mat-dialog-title><mat-icon>account_circle</mat-icon> Sign-In</h2>
     <mat-dialog-content>
-      <mat-card>
-        <mat-card-title-group>
-          <mat-icon>account_circle</mat-icon>
-          <mat-card-title>Sign-In</mat-card-title>
-          <mat-card-subtitle>{{ data.message }}</mat-card-subtitle>
-        </mat-card-title-group>
-        <mat-card-content>
-          <mat-form-field>
-            <mat-label>User name</mat-label>
-            <input
-              matInput
-              type="text"
-              value=""
-              #username
-              (keyup)="keyUp($event, username, password)"
-              style="width:110px;"
-              (focus)="handleFocus($event)"
-            /> </mat-form-field
-          ><br />
-          <mat-form-field>
-            <mat-label>Password</mat-label>
-            <input
-              matInput
-              type="password"
-              value=""
-              #password
-              (keyup)="keyUp($event, username, password)"
-              style="width:110px;"
-              (focus)="handleFocus($event)"
-            />
-          </mat-form-field>
-        </mat-card-content>
-        <mat-card-actions align="end">
-          <button
-            default
-            mat-raised-button
-            [disabled]="username.value.length === 0"
-            (click)="login(username.value, password.value)"
-          >
-            {{ data.button1Text }}
-          </button>
-          &nbsp;&nbsp;
-          <button default mat-raised-button (click)="cancel()">
-            {{ data.button2Text }}
-          </button>
-        </mat-card-actions>
-      </mat-card>
+      <p>{{ data.message }}</p>
+
+      <mat-form-field>
+        <mat-label>User name</mat-label>
+        <input
+          matInput
+          type="text"
+          value=""
+          #username
+          (keyup)="keyUp($event, username, password)"
+          style="width:110px;"
+          (focus)="handleFocus($event)"
+        /> </mat-form-field
+      ><br />
+      <mat-form-field>
+        <mat-label>Password</mat-label>
+        <input
+          matInput
+          type="password"
+          value=""
+          #password
+          (keyup)="keyUp($event, username, password)"
+          style="width:110px;"
+          (focus)="handleFocus($event)"
+        />
+      </mat-form-field>
     </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <obc-button
+        default
+        [disabled]="username.value.length === 0"
+        (click)="login(username.value, password.value)"
+      >
+        {{ data.button1Text }}
+      </obc-button>
+      &nbsp;&nbsp;
+      <obc-button default (click)="cancel()">
+        {{ data.button2Text }}
+      </obc-button>
+    </mat-dialog-actions>
   `
 })
 export class LoginDialog implements OnInit {
@@ -395,6 +408,7 @@ export class LoginDialog implements OnInit {
 }
 
 @Component({
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   selector: 'message-bar',
   imports: [MatIconModule],
   template: `
@@ -409,7 +423,7 @@ export class LoginDialog implements OnInit {
   styles: [
     `
       .message-bar {
-        font-family: roboto;
+        font-family: inherit;
       }
     `
   ]

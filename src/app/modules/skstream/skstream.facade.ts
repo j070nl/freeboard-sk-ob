@@ -243,6 +243,10 @@ export class SKStreamFacade {
 
   /** subscribe to signal k paths */
   subscribe() {
+    // Worker message order is preserved. Apply the current filters before the
+    // server replays cached target data, otherwise early identity/type values can
+    // be discarded and an already-open chart remains in the unknown class.
+    this.sendConfig();
     this.worker.postMessage({
       cmd: 'subscribe',
       options: {

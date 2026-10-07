@@ -56,7 +56,9 @@ describe('AppComponent', () => {
     app.config.display.plugins.instruments = '/@signalk/instrumentpanel';
     fixture.detectChanges();
     expect(
-      fixture.debugElement.query(By.css('.instrumentPanelToggle button'))
+      fixture.debugElement.query(
+        By.css('.instrumentPanelToggle obc-icon-button')
+      )
     ).not.toBeNull();
 
     // Settings -> Display -> Select Instruments App: "None" stores a null url.
@@ -85,7 +87,9 @@ describe('AppComponent', () => {
       fixture.debugElement.query(By.css('.instrumentPanelToggle'))
     ).not.toBeNull();
     expect(
-      fixture.debugElement.query(By.css('.instrumentPanelToggle button'))
+      fixture.debugElement.query(
+        By.css('.instrumentPanelToggle obc-icon-button')
+      )
     ).toBeNull();
   });
 

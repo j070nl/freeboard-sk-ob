@@ -12,6 +12,7 @@ import { Style } from 'ol/style';
 import { MapComponent } from '../map.component';
 import { SKAircraft, SKAtoN, SKSaR, SKVessel, SKMeteo } from 'src/app/modules';
 import { FBFeatureLayerComponent } from '../sk-feature.component';
+import { aisVesselTypeGroup } from 'src/app/modules/icons';
 
 export type SKTarget = SKVessel | SKAircraft | SKAtoN | SKSaR | SKMeteo;
 
@@ -135,7 +136,7 @@ export class AISBaseLayerComponent
       checkImo(id) && checkBuddy(id);
 
     if (this.filterByShipType && Array.isArray(this.filterShipTypes)) {
-      const st = Math.floor(this.targets.get(id).type.id / 10) * 10;
+      const st = aisVesselTypeGroup(this.targets.get(id).type);
       return this.filterShipTypes.includes(st) && passesSentinelFilters(id);
     }
     if (!this.filterIds) {

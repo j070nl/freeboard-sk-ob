@@ -1,3 +1,5 @@
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
 import {
   Component,
   OnInit,
@@ -198,7 +200,9 @@ const OFFSET_GRACE_PERIOD = 2000;
 
 @Component({
   selector: 'fb-map',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
+    OpenBridgeControlDirective,
     MatTooltipModule,
     MatListModule,
     MatIconModule,

@@ -1,9 +1,14 @@
 /** Experiments Components **
  ********************************/
 
-import { Component, Output, EventEmitter } from '@angular/core';
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  Output,
+  EventEmitter
+} from '@angular/core';
 
-import { MatButtonModule } from '@angular/material/button';
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
@@ -11,7 +16,13 @@ import { MatMenuModule } from '@angular/material/menu';
 /********* ExperimentsComponent ********/
 @Component({
   selector: 'fb-experiments',
-  imports: [MatMenuModule, MatIconModule, MatButtonModule, MatTooltipModule],
+  imports: [
+    MatMenuModule,
+    MatIconModule,
+    OpenBridgeControlDirective,
+    MatTooltipModule
+  ],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <mat-menu #experimentsmenu="matMenu">
       <!--
@@ -30,15 +41,14 @@ import { MatMenuModule } from '@angular/material/menu';
     </mat-menu>
 
     <div>
-      <button
-        class="button-toolbar"
-        mat-mini-fab
+      <obc-icon-button
+        aria-label="Experiments"
         [matMenuTriggerFor]="experimentsmenu"
         matTooltip="Experiments"
         matTooltipPosition="left"
       >
         <mat-icon>science</mat-icon>
-      </button>
+      </obc-icon-button>
     </div>
   `,
   styles: [``]

@@ -1,3 +1,4 @@
+import { ThemePreference } from 'src/app/lib/theme/theme';
 /** Settings Service
  * ************************************/
 import { Injectable } from '@angular/core';
@@ -172,10 +173,13 @@ export class SettingsOptions {
     ])
   };
 
-  darkMode = new Map([
-    [0, 'Use OS setting'],
-    [1, 'Use Signal K Mode'],
-    [-1, 'On']
+  darkMode = new Map<ThemePreference, string>([
+    ['bright', 'Bright'],
+    ['day', 'Day'],
+    ['dusk', 'Dusk'],
+    ['night', 'Night'],
+    [0, 'Automatic — OS'],
+    [1, 'Automatic — Signal K']
   ]);
 
   windIndicator = new Map<WindIndicator, string>([

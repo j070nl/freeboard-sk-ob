@@ -4,6 +4,7 @@ Autopilot Console component
 ***********************************/
 import {
   Component,
+  CUSTOM_ELEMENTS_SCHEMA,
   signal,
   ChangeDetectionStrategy,
   input,
@@ -13,30 +14,28 @@ import {
   computed
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DragDropModule } from '@angular/cdk/drag-drop';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AppFacade } from 'src/app/app.facade';
 import { Convert } from 'src/app/lib/convert';
 import { AutopilotService } from './autopilot.service';
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
+import '@oicl/openbridge-webcomponents/dist/components/button/button.js';
+import '@oicl/openbridge-webcomponents/dist/components/toggle-switch/toggle-switch.js';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-close-google.js';
 
 @Component({
   selector: 'autopilot-console',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     MatTooltipModule,
     CommonModule,
     DragDropModule,
-    MatButtonModule,
-    MatCardModule,
     MatIconModule,
     MatMenuModule,
-    MatSlideToggleModule,
-    FormsModule
+    OpenBridgeControlDirective
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrls: ['./autopilot.component.css'],
@@ -65,231 +64,121 @@ import { AutopilotService } from './autopilot.service';
         </button>
       }
     </mat-menu>
-    <mat-card cdkDragHandle>
-      <div
-        class="autopilot-console"
-        cdkDrag
-        (cdkDragReleased)="dragEventHandler($event, 'released')"
-      >
-        <div class="title" style="cursor: grab;">
-          <div style="text-align: center;width: 100%;">
-            <mat-icon
-              class="icon-warn"
-              style="cursor: pointer;"
-              matTooltip="Close"
-              (click)="handleClose()"
-              >close</mat-icon
-            >
+    <section
+      class="autopilot-console"
+      aria-label="Autopilot"
+      cdkDrag
+      (cdkDragReleased)="dragEventHandler($event, 'released')"
+    >
+      <header class="panel-header">
+        <div class="drag-handle" cdkDragHandle>
+          <span class="label">{{
+            apData().default ? 'Target' : 'No Pilot'
+          }}</span>
+        </div>
+        <obc-icon-button
+          class="close-button"
+          aria-label="Close autopilot"
+          matTooltip="Close"
+          (click)="handleClose()"
+        >
+          <obi-close-google></obi-close-google>
+        </obc-icon-button>
+      </header>
+      <div class="readout">
+        <div class="target">
+          @if (apData().default || apData().state === 'off-line') {
+            <span>{{ formatTargetValue(apData().target) }}</span>
+          } @else {
+            <span>--</span>
+          }
+          <span class="unit">&deg;</span>
+        </div>
+      </div>
+      <div class="state-row">
+        <div>
+          <div class="label">Status</div>
+          <div class="value">
+            {{
+              apData().default || apData().state === 'off-line'
+                ? apData().state
+                : '--'
+            }}
           </div>
         </div>
-        <mat-card-content>
-          <div class="content">
-            <div style="height: 45px;color:whitesmoke;">
-              Autopilot<br />
-              {{ apData().default ?? '' }}
-            </div>
-            <div class="lcd">
-              <div style="padding: 5px 0;display: flex;">
-                <div class="dial-text-title">
-                  @if (apData().default) {
-                    <span>Target</span>
-                  } @else {
-                    <span>No Pilot</span>
-                  }
-                </div>
-              </div>
-
-              <div class="dial-text">
-                <div class="dial-text-value">
-                  @if (apData().default || apData().state === 'off-line') {
-                    <span>{{ formatTargetValue(apData().target) }}</span>
-                  } @else {
-                    <span>--</span>
-                  }
-                  &deg;
-                </div>
-              </div>
-
-              <div style="padding: 10px 0;display: flex;">
-                <div class="dial-text-title">
-                  @if (apData().default || apData().state === 'off-line') {
-                    <span>{{ apData().state }}</span>
-                  } @else {
-                    <span>--</span>
-                  }
-                </div>
-                <div class="dial-text-title">
-                  @if (apData().default || apData().state === 'off-line') {
-                    <span>{{ apData().mode }}</span>
-                  } @else {
-                    <span>--</span>
-                  }
-                </div>
-              </div>
-            </div>
-
-            <div class="button-bar">
-              <div style="width:50%;">
-                @if (stateOptions().length > 2) {
-                  <button
-                    class="button-primary"
-                    style="max-width:100px;"
-                    mat-raised-button
-                    [matMenuTriggerFor]="statemenu"
-                    [disabled]="noPilot()"
-                    [ngClass]="{
-                      'button-warn': apData().enabled,
-                      'button-primary': !apData().enabled
-                    }"
-                  >
-                    <div
-                      style="white-space: pre;text-overflow: ellipsis;overflow: hidden;max-width:90px;"
-                      [innerText]="formatLabel(apData().state)"
-                    ></div>
-                  </button>
-                } @else {
-                  <mat-slide-toggle
-                    [checked]="apData().enabled"
-                    [disabled]="noPilot()"
-                    (toggleChange)="toggleEngaged()"
-                    [matTooltip]="apData().enabled ? 'Disengage' : 'Engage'"
-                  ></mat-slide-toggle>
-                }
-              </div>
-
-              <div>
-                @if (modeOptions().length !== 0) {
-                  <button
-                    class="button-secondary"
-                    mat-raised-button
-                    [matMenuTriggerFor]="modemenu"
-                    [disabled]="noPilot() || modeOptions().length === 0"
-                  >
-                    Mode
-                  </button>
-                }
-              </div>
-            </div>
-
-            @if (apData().mode === 'dodge') {
-              <div class="button-bar-thin">
-                <div style="width:50%;">
-                  <button
-                    class="button-secondary"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="dodgeAdjust(-10)"
-                  >
-                    &lt;&lt;</button
-                  >&nbsp;
-                  <button
-                    class="button-toolbar"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="dodgeAdjust(-1)"
-                  >
-                    &lt;
-                  </button>
-                </div>
-
-                <div>
-                  <button
-                    class="button-toolbar"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="dodgeAdjust(1)"
-                  >
-                    &gt;</button
-                  >&nbsp;
-                  <button
-                    class="button-secondary"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="dodgeAdjust(10)"
-                  >
-                    &gt;&gt;
-                  </button>
-                </div>
-              </div>
-            } @else {
-              <div class="button-bar-thin">
-                <div style="width:50%;">
-                  <button
-                    class="button-secondary"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="targetAdjust(-10)"
-                  >
-                    -10</button
-                  >&nbsp;
-                  <button
-                    class="button-toolbar"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="targetAdjust(-1)"
-                  >
-                    -1
-                  </button>
-                </div>
-
-                <div>
-                  <button
-                    class="button-toolbar"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="targetAdjust(1)"
-                  >
-                    +1</button
-                  >&nbsp;
-                  <button
-                    class="button-secondary"
-                    mat-mini-fab
-                    [disabled]="
-                      !apData().default || apData().state === 'off-line'
-                    "
-                    (click)="targetAdjust(10)"
-                  >
-                    +10
-                  </button>
-                </div>
-              </div>
-            }
-
-            <div class="button-bar-thin">
-              <div style="text-align:center;width:100%;">
-                @if (dodgeAction()) {
-                  <button
-                    [ngClass]="{
-                      'button-accent': apData().mode === 'dodge',
-                      'button-toolbar': apData().mode !== 'dodge'
-                    }"
-                    [disabled]="noPilot()"
-                    mat-raised-button
-                    (click)="toggleDodge()"
-                  >
-                    Dodge
-                  </button>
-                }
-              </div>
-            </div>
+        <div>
+          <div class="label">Mode</div>
+          <div class="value">
+            {{
+              apData().default || apData().state === 'off-line'
+                ? apData().mode
+                : '--'
+            }}
           </div>
-        </mat-card-content>
+        </div>
       </div>
-    </mat-card>
+      <div class="controls">
+        @if (stateOptions().length > 2) {
+          <obc-button
+            class="state-button"
+            [fullWidth]="true"
+            [class.active]="apData().enabled"
+            [matMenuTriggerFor]="statemenu"
+            [disabled]="noPilot()"
+          >
+            <span class="state-label">{{ formatLabel(apData().state) }}</span>
+          </obc-button>
+        } @else {
+          <obc-toggle-switch
+            label="Engage"
+            [checked]="apData().enabled"
+            [externalControl]="true"
+            [disabled]="noPilot()"
+            (change)="toggleEngaged()"
+            [matTooltip]="apData().enabled ? 'Disengage' : 'Engage'"
+          ></obc-toggle-switch>
+        }
+        @if (modeOptions().length !== 0) {
+          <obc-button
+            class="mode-button"
+            [fullWidth]="true"
+            [matMenuTriggerFor]="modemenu"
+            [disabled]="noPilot() || modeOptions().length === 0"
+            >Mode</obc-button
+          >
+        }
+      </div>
+      <div class="adjust">
+        @for (delta of [-10, -1, 1, 10]; track delta) {
+          <obc-button
+            [fullWidth]="true"
+            [disabled]="!apData().default || apData().state === 'off-line'"
+            (click)="
+              apData().mode === 'dodge'
+                ? dodgeAdjust(delta)
+                : targetAdjust(delta)
+            "
+          >
+            @if (apData().mode === 'dodge') {
+              {{ ['<<', '<', '>', '>>'][$index] }}
+            } @else {
+              {{ delta > 0 ? '+' + delta : delta }}
+            }
+          </obc-button>
+        }
+      </div>
+      @if (dodgeAction()) {
+        <div class="dodge-row">
+          <obc-button
+            [class.active]="apData().mode === 'dodge'"
+            [attr.aria-pressed]="apData().mode === 'dodge'"
+            [disabled]="noPilot()"
+            (click)="toggleDodge()"
+            >Dodge</obc-button
+          >
+        </div>
+      }
+    </section>
   `
 })
 export class AutopilotComponent {

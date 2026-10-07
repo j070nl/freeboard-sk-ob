@@ -1,4 +1,18 @@
 import {
+  OpenBridgeSelectComponent,
+  OpenBridgeOptionComponent
+} from 'src/app/lib/components/openbridge/select.component';
+import { OpenBridgeSliderComponent } from 'src/app/lib/components/openbridge/slider.component';
+import '@oicl/openbridge-webcomponents/dist/components/button/button.js';
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-close-google.js';
+import { OpenBridgeCheckboxComponent } from 'src/app/lib/components/openbridge/checkbox.component';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import '@oicl/openbridge-webcomponents/dist/components/dropdown-button/dropdown-button.js';
+import { MapAppearanceService } from 'src/app/lib/theme/map-appearance.service';
+import { ThemeService } from 'src/app/lib/theme/theme.service';
+import { normalizeThemePreference } from 'src/app/lib/theme/theme';
+import {
   Component,
   OnInit,
   ElementRef,
@@ -10,7 +24,6 @@ import {
 import { FormsModule, NgModel } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -19,7 +32,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatListModule } from '@angular/material/list';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -54,17 +66,21 @@ interface PreferredPathsResult {
 //** Settings **
 @Component({
   selector: 'settings-dialog',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
+    OpenBridgeSelectComponent,
+    OpenBridgeOptionComponent,
+    OpenBridgeControlDirective,
     FormsModule,
     MatDialogModule,
-    MatCheckboxModule,
+    OpenBridgeCheckboxComponent,
     MatRadioModule,
     MatCardModule,
     MatListModule,
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
-    MatSliderModule,
+    OpenBridgeSliderComponent,
     MatSlideToggleModule,
     MatSelectModule,
     MatFormFieldModule,
@@ -84,6 +100,22 @@ export class SettingsDialog implements OnInit {
   };
 
   protected options: SettingsOptions;
+  protected readonly themeOptions = Array.from(
+    new SettingsOptions().darkMode.entries()
+  ).map(([value, label]) => ({ value: String(value), label }));
+
+  protected changeTheme(selection: { value: unknown }): void {
+    const value = selection.value;
+    this.facade.settings.display.darkMode.source = normalizeThemePreference(
+      value === '0' ? 0 : value === '1' ? 1 : value
+    );
+    const preference = this.facade.settings.display.darkMode.source;
+    this.theme.setLocalTheme(
+      typeof preference === 'string' ? preference : null
+    );
+    this.persistModel('darkTheme');
+  }
+
   protected readonly centerOffsetLimit = CENTER_OFFSET_LIMIT;
 
   protected aisStateFilter = {
@@ -107,6 +139,8 @@ export class SettingsDialog implements OnInit {
   protected wakeLock = inject(WakeLockService);
   private s57 = inject(S57Service);
   protected app = inject(AppFacade);
+  protected readonly theme = inject(ThemeService);
+  protected readonly mapAppearance = inject(MapAppearanceService);
   protected radarApi = inject(RadarAPIService);
 
   constructor() {

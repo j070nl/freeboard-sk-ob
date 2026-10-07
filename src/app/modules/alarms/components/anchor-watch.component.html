@@ -16,30 +16,46 @@
       </div>
     </mat-card-title>
     <mat-card-content>
-      <div>
-        <b>Status:</b>
-      </div>
-      <div
-        style="
-          width: 150px;
-          height: 150px;
-          color: black;
-          background-position: top left;
-          background-size: cover;
-        "
-        [style.backgroundImage]="bgImage"
-      >
-        <b
-          style="
-            position: relative;
-            top: 30px;
-            left: 80px;
-            width: 35px;
-            text-align: right;
-          "
+      <div>Alarm radius</div>
+      <div class="anchor-diagram" [attr.data-raised]="raised">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 240 180"
+          aria-hidden="true"
         >
-          {{ formattedRadiusValue() }}
-        </b>
+          <g fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle class="radius-ring" cx="120" cy="90" r="78" />
+            <path
+              opacity=".16"
+              d="M42 90H198M120 12V168"
+              stroke-dasharray="3 5"
+            />
+            <path d="M120 26V74M116 31L120 26L124 31" />
+            <path
+              class="anchor-rode"
+              d="M145 103L154 131"
+              stroke-dasharray="3 3"
+            />
+          </g>
+          <path
+            d="M91 88H112L106 77H128L137 88H151L144 103H98Z M113 80L118 88H132L126 80Z"
+            fill="currentColor"
+            fill-rule="evenodd"
+          />
+          <g
+            class="anchor-symbol"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="154" cy="133" r="3" />
+            <path
+              d="M154 136V151M148 140H160M144 145Q144 151 154 154Q164 151 164 145M144 145L143 149M164 145L165 149"
+            />
+          </g></svg
+        ><b>{{ formattedRadiusValue() }}</b>
       </div>
     </mat-card-content>
 

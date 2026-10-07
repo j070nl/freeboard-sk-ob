@@ -1,5 +1,6 @@
 import {
   Component,
+  CUSTOM_ELEMENTS_SCHEMA,
   ChangeDetectionStrategy,
   output,
   input,
@@ -10,7 +11,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatButtonModule } from '@angular/material/button';
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
 import { FormsModule } from '@angular/forms';
 import { MatInputModule } from '@angular/material/input';
 import { ScrollingModule } from '@angular/cdk/scrolling';
@@ -29,13 +30,14 @@ import { TrackHistoryService } from 'src/app/modules/skstream/track-history.serv
   selector: 'ais-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './aislist.html',
-  styleUrls: ['../resourcelist.css'],
+  styleUrls: ['../resourcelist.css', '../resource-panels.css'],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     MatTooltipModule,
     MatIconModule,
     MatCardModule,
     MatCheckboxModule,
-    MatButtonModule,
+    OpenBridgeControlDirective,
     FormsModule,
     MatInputModule,
     ScrollingModule,

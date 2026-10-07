@@ -1,3 +1,7 @@
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
+import '@oicl/openbridge-webcomponents/dist/components/button/button.js';
+import '@oicl/openbridge-webcomponents/dist/components/toggle-switch/toggle-switch.js';
 /***********************************
   Alert List
   <alert-list>
@@ -14,10 +18,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { CdkDrag } from '@angular/cdk/drag-drop';
 import { AppFacade } from 'src/app/app.facade';
 import { getAlertIcon } from '../../icons';
@@ -26,14 +28,15 @@ import { NotificationManager } from '../notification-manager';
 
 @Component({
   selector: 'alert-list',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     MatTooltipModule,
     CommonModule,
     MatButtonModule,
-    MatCardModule,
+    OpenBridgeControlDirective,
     MatIconModule,
     MatMenuModule,
-    MatSlideToggleModule,
+
     FormsModule,
     CdkDrag
   ],
@@ -46,20 +49,19 @@ import { NotificationManager } from '../notification-manager';
         &nbsp;Overboard!
       </button>
     </mat-menu>
-    <mat-card appearance="outlined">
+    <div>
       <div class="alert-list-main mat-app-background" cdkDrag>
         <div class="title" cdkDragHandle>
           @if (app.featureFlags().notificationApi) {
             <div>
-              <button
-                class="button-warn"
-                mat-raised-button
+              <obc-button
                 matTooltip="Raise Alarm"
                 [matMenuTriggerFor]="alarmsmenu"
+                [showLeadingIcon]="true"
               >
-                <mat-icon>warning</mat-icon>
+                <mat-icon slot="leading-icon">warning</mat-icon>
                 Raise
-              </button>
+              </obc-button>
             </div>
           }
           <div
@@ -72,26 +74,30 @@ import { NotificationManager } from '../notification-manager';
             Alert List
           </div>
           <div style="display:flex">
-            <button
-              mat-icon-button
+            <obc-icon-button
               matTooltip="Silence All"
               (click)="silenceAll()"
+              aria-label="Silence All"
             >
               <mat-icon class="ob" svgIcon="sound-off-fill"></mat-icon>
-            </button>
+            </obc-icon-button>
             &nbsp; &nbsp;
             <div>
-              <mat-slide-toggle
+              <obc-toggle-switch
+                label="Sound"
                 matTooltip="Sound on /off"
                 [checked]="!this.app.config.display.muteSound"
-                (toggleChange)="togglePlaySound()"
+                (change)="togglePlaySound()"
               >
-              </mat-slide-toggle>
+              </obc-toggle-switch>
             </div>
             &nbsp;
-            <button mat-icon-button (click)="handleClose()">
+            <obc-icon-button
+              (click)="handleClose()"
+              aria-label="Close alert list"
+            >
               <mat-icon>close</mat-icon>
-            </button>
+            </obc-icon-button>
           </div>
         </div>
 
@@ -124,18 +130,18 @@ import { NotificationManager } from '../notification-manager';
                   >
                     {{ item[1].message }}
                   </div>
-                  <div style="width:90px;">
+                  <div style="min-width:96px; display:flex; flex-wrap:wrap;">
                     @if (
                       app.featureFlags().notificationApi &&
                       item[1].sound &&
                       item[1].canSilence
                     ) {
-                      <button
-                        mat-icon-button
+                      <obc-icon-button
                         [matTooltip]="item[1].silenced ? 'Silenced' : 'Silence'"
                         matTooltipPosition="below"
                         [disabled]="item[1].acknowledged || item[1].silenced"
                         (click)="muteAlert(item[1].path)"
+                        [ariaLabel]="item[1].silenced ? 'Silenced' : 'Silence'"
                       >
                         <mat-icon
                           [class]="item[1].acknowledged ? '' : 'ob'"
@@ -145,7 +151,7 @@ import { NotificationManager } from '../notification-manager';
                               : 'sound-high-fill'
                           "
                         ></mat-icon>
-                      </button>
+                      </obc-icon-button>
                       &nbsp;
                     }
                     @if (
@@ -153,26 +159,26 @@ import { NotificationManager } from '../notification-manager';
                       item[1].canAcknowledge
                     ) {
                       @if (!item[1].acknowledged) {
-                        <button
-                          mat-icon-button
+                        <obc-icon-button
                           matTooltip="Acknowledge"
                           matTooltipPosition="below"
                           [disabled]="item[1].acknowledged"
                           (click)="ackAlert(item[1].path)"
+                          aria-label="Acknowledge"
                         >
                           <mat-icon>check</mat-icon>
-                        </button>
+                        </obc-icon-button>
                       } @else {
                         @if (item[1].canCancel) {
-                          <button
-                            mat-icon-button
+                          <obc-icon-button
                             matTooltip="Clear / Cancel"
                             matTooltipPosition="below"
                             [disabled]="!item[1].acknowledged"
                             (click)="clearAlert(item[1].path)"
+                            aria-label="Clear / Cancel"
                           >
                             <mat-icon>close</mat-icon>
-                          </button>
+                          </obc-icon-button>
                         }
                       }
                     }
@@ -183,7 +189,7 @@ import { NotificationManager } from '../notification-manager';
           </div>
         </div>
       </div>
-    </mat-card>
+    </div>
   `
 })
 export class AlertListComponent {

@@ -1,7 +1,7 @@
+import { EmbeddedVisibilityService } from '../../../../../lib/embedded-visibility.service';
 import {
   ChangeDetectionStrategy,
   Component,
-  HostListener,
   Input,
   Output,
   OnChanges,
@@ -47,6 +47,8 @@ export class RadarComponent implements OnInit, OnChanges, OnDestroy {
   protected layer: Layer;
 
   private radarRenderService = inject(RadarRenderService);
+  private readonly embeddedVisibility = inject(EmbeddedVisibilityService);
+  private stopVisibility?: () => void;
   protected mapComponent = inject(MapComponent);
   protected changeDetectorRef = inject(ChangeDetectorRef);
 
@@ -76,21 +78,20 @@ export class RadarComponent implements OnInit, OnChanges, OnDestroy {
       this.layerReady.complete();
     }
 
-    if (!document.hidden) {
-      this.startStream();
-    }
+    this.stopVisibility = this.embeddedVisibility.observe(() =>
+      this.onVisibilityChange()
+    );
   }
 
   // The spoke stream tells the radar provider that someone is watching the
   // radar, and it may let an unwatched radar stand down. So the stream is
   // held only while this page is actually on screen: a backgrounded tab or
   // a phone in a pocket must not keep the radar transmitting.
-  @HostListener('document:visibilitychange')
   onVisibilityChange() {
     if (!this.layer) {
       return;
     }
-    if (document.hidden) {
+    if (!this.embeddedVisibility.visible) {
       this.stopStream();
     } else {
       this.startStream();
@@ -137,6 +138,7 @@ export class RadarComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.stopVisibility?.();
     this.stopStream();
     const map = this.mapComponent.getMap();
     if (this.layer && map) {

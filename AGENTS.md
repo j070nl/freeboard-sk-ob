@@ -1,3 +1,68 @@
+# Local Freeboard/OpenBridge working agreements
+
+## Local purpose and boundaries
+
+This checkout contains custom OpenBridge presentation and AIS repairs; it is
+not a clean upstream installation. Read [PROJECT_STATE.md](PROJECT_STATE.md)
+before work, then the relevant sections of
+[FREEBOARD_OPENBRIDGE_HANDOFF.md](FREEBOARD_OPENBRIDGE_HANDOFF.md) and
+[OPENBRIDGE_FREEBOARD_GUIDELINES.md](OPENBRIDGE_FREEBOARD_GUIDELINES.md).
+The system map is [/home/pi/openplotter-project/PROJECT_STATE.md](/home/pi/openplotter-project/PROJECT_STATE.md).
+
+- Treat upstream Freeboard as source to compare and deliberately integrate.
+  Never overwrite local work with a stock package or infer permission to
+  checkout/rebase/reset from upstream contribution instructions below.
+- Preserve SKIP's `freeboard:theme` / `freeboard:theme-ready` synchronization,
+  four palettes, browser brightness preferences and iframe lifecycle.
+- Preserve AIS position-age, expiry/recovery, identity/radius and classification
+  repairs unless replaced intentionally by a verified upstream equivalent.
+- Before changing interfaces used by SKIP, inspect `/home/pi/skip-dev` and its
+  state. Preserve Signal K resources, route metadata, extension API, transport,
+  authorization and operational autopilot/notification semantics.
+- Installed state is `/home/pi/.signalk/node_modules/@signalk/freeboard-sk`;
+  its version label can differ from the custom frontend's source baseline.
+  Do not write there or deploy unless the task explicitly authorizes it.
+- Preserve tracked and untracked custom files, release evidence and lockfiles.
+  Do not casually run release/version scripts, mass formatting or build steps
+  that regenerate unrelated files.
+- For functional changes, run focused tests, type/template/lint checks and the
+  required build. Use `npm run test:ci` and `npm run build:web` wrappers;
+  use `npm run build:all` when helper/full-package validation is needed.
+  Verify affected theme, AIS and SKIP/route-planner integration behavior;
+  distinguish fixture checks from live-browser and physical-equipment tests.
+- Existing local release tooling and historical rollback commands are not
+  deployment authorization. Check the latest verified manifest before rollback.
+
+## Session and handover rules
+
+Start a fresh session by reading this file, then `PROJECT_STATE.md`, then
+inspecting current Git status (including untracked files). Read the linked
+handoff/contract documents for the area being changed. State documents are dated
+snapshots: verify mutable facts against files, manifests and deployment evidence.
+
+Before finishing any substantial task:
+1. Run checks appropriate to the change; for documentation, verify content,
+   paths and scope without generating application artifacts.
+2. Update `PROJECT_STATE.md`: what was inspected, what changed, what was
+   verified, unresolved issues, and the exact next recommended step.
+3. Preserve still-relevant context and keep the state concise. Distinguish
+   observed facts, historical records, inferences and UNKNOWN / NEEDS VERIFICATION.
+4. Never mark work complete without tests or other appropriate verification.
+5. Give the user a short summary. Documentation is not permission to deploy.
+
+Preserve dirty worktrees and untracked/ignored custom work. Do not clean, reset,
+discard, normalize unrelated files or alter generated artifacts casually.
+Follow the user's task scope; commits require an explicit request. Runtime
+writes, deployments, service restarts and equipment commands require task
+authorization. Existing deployment scripts are reference material, not authority.
+
+## Preserved upstream contributor reference
+
+The original guidance below is retained to avoid losing technical contracts.
+Its upstream PR workflow applies only to an authorized upstream contribution,
+not to ordinary local maintenance or audits. The local scope rules above and
+the user's current instructions govern this customized checkout.
+
 # Freeboard-SK
 
 Freeboard-SK (`@signalk/freeboard-sk`) is the primary chart-plotter web app for the

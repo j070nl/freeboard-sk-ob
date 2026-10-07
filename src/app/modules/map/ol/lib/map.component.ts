@@ -1,3 +1,4 @@
+import { EmbeddedVisibilityService } from '../../../../lib/embedded-visibility.service';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -157,6 +158,8 @@ export class MapComponent implements OnInit, OnDestroy {
   protected element = inject(ElementRef);
   protected mapService = inject(MapService);
   private ngZone = inject(NgZone);
+  private readonly embeddedVisibility = inject(EmbeddedVisibilityService);
+  private stopVisibility?: () => void;
 
   constructor() {
     this.changeDetectorRef.detach();
@@ -180,10 +183,18 @@ export class MapComponent implements OnInit, OnDestroy {
       this.map.once('postrender', () => {
         this.afterMapReady();
       });
+      this.stopVisibility = this.embeddedVisibility.observe((visible) => {
+        // Detach only the renderer target; preserve view, layers and loaded sources.
+        const size = this.map.getSize();
+        this.map.setTarget(visible ? target : undefined);
+        if (visible) this.map.updateSize();
+        else if (size) this.map.setSize(size); // Keep navigation geometry valid while detached.
+      });
     });
   }
 
   ngOnDestroy() {
+    this.stopVisibility?.();
     if (!this.map) {
       return;
     }
@@ -562,7 +573,7 @@ export class MapComponent implements OnInit, OnDestroy {
   private updateSizeThrottle = () => {
     clearTimeout(this.timeoutId);
     this.timeoutId = setTimeout(() => {
-      this.map.updateSize();
+      if (this.map && this.embeddedVisibility.visible) this.map.updateSize();
     }, 100);
   };
 

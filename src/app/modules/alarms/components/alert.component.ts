@@ -1,3 +1,6 @@
+import { OpenBridgeControlDirective } from 'src/app/lib/components/openbridge/control.directive';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import '@oicl/openbridge-webcomponents/dist/components/button/button.js';
 // Alert Component
 
 import {
@@ -58,7 +61,9 @@ const SoundFiles = {
 
 @Component({
   selector: 'fb-alert',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
+    OpenBridgeControlDirective,
     MatIconModule,
     MatButtonModule,
     MatCardModule,
@@ -104,12 +109,13 @@ const SoundFiles = {
               <div style="display:flex;flex-wrap: wrap;">
                 @if (alert().sound && alert().canSilence) {
                   <div style="text-align: left;">
-                    <button
-                      mat-raised-button
+                    <obc-button
                       (click)="muteAlarm()"
                       [disabled]="alert().silenced"
+                      [showLeadingIcon]="true"
                     >
                       <mat-icon
+                        slot="leading-icon"
                         class="ob"
                         [svgIcon]="
                           alert().silenced
@@ -118,26 +124,26 @@ const SoundFiles = {
                         "
                       ></mat-icon>
                       {{ alert().silenced ? 'MUTED' : 'MUTE' }}
-                    </button>
+                    </obc-button>
                   </div>
                 }
                 @if (alert().canAcknowledge) {
                   <div>
-                    <button mat-raised-button (click)="ackAlarm()">
-                      <mat-icon>check</mat-icon>
+                    <obc-button (click)="ackAlarm()" [showLeadingIcon]="true">
+                      <mat-icon slot="leading-icon">check</mat-icon>
                       ACK
-                    </button>
+                    </obc-button>
                   </div>
                 } @else {
-                  <button
-                    mat-raised-button
+                  <obc-button
                     matTooltip="Dismiss"
                     matTooltipPosition="left"
                     (click)="hide()"
+                    [showLeadingIcon]="true"
                   >
-                    <mat-icon>clear_all</mat-icon>
+                    <mat-icon slot="leading-icon">clear_all</mat-icon>
                     Dismiss
-                  </button>
+                  </obc-button>
                 }
 
                 @if (app.data.activeRoute) {

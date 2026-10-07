@@ -1,0 +1,222 @@
+@use '@angular/material' as mat;
+
+@font-face {
+    font-family: 'Noto Sans';
+    src: url('./assets/fonts/NotoSans.ttf') format('truetype');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+html[data-obc-theme] {
+    --fb-page: var(--container-background-color);
+    --fb-viewport: var(--integration-container-background-color);
+    --fb-component: var(--container-global-color);
+    --fb-section: var(--container-section-color);
+    --fb-context: var(--container-global-color);
+    --fb-text: var(--on-normal-active-color);
+    --fb-text-secondary: var(--on-normal-neutral-color);
+    --fb-disabled: var(--on-normal-disabled-color);
+    --fb-active: var(--element-active-color);
+    --fb-selected: var(--selected-enabled-background-color);
+    --fb-on-selected: var(--on-selected-active-color);
+    --fb-warning: var(--alert-warning-color);
+    --fb-alarm: var(--alert-alarm-color);
+    --fb-success: var(--alert-running-color);
+    --fb-outline: var(--border-outline-color);
+    --fb-outline-selected: var(--selected-enabled-border-color);
+    --fb-focus: var(--border-focus-color);
+    --fb-scroll-track: var(--fb-component);
+    --fb-scroll-thumb: var(--element-neutral-color);
+    --fb-scroll-hover: var(--element-active-color);
+    --fb-space: var(--ui-components-button-label-spacing);
+    --fb-panel-padding: calc(2 * var(--fb-space));
+    --fb-section-gap: calc(3 * var(--fb-space));
+    --fb-touch-target: var(--global-size-spacing-touch-target-min);
+    font-family: 'Noto Sans', sans-serif;
+    background: var(--fb-page);
+    color: var(--fb-text);
+
+    // CDK retains overlay placement, dismissal and focus management during migration.
+    @include mat.menu-overrides((
+        container-color: var(--fb-context),
+        item-label-text-color: var(--fb-text),
+        item-icon-color: var(--fb-text-secondary),
+        divider-color: var(--fb-outline),
+        item-hover-state-layer-color: var(--normal-hover-background-color),
+        item-focus-state-layer-color: var(--normal-focused-background-color),
+        item-label-text-font: 'Noto Sans',
+        container-shape: 4px
+    ));
+    @include mat.dialog-overrides((
+        container-color: var(--fb-context),
+        subhead-color: var(--fb-text),
+        supporting-text-color: var(--fb-text),
+        subhead-font: 'Noto Sans',
+        supporting-text-font: 'Noto Sans',
+        container-shape: 4px
+    ));
+    @include mat.sidenav-overrides((
+        container-background-color: var(--fb-component),
+        container-text-color: var(--fb-text),
+        content-background-color: var(--fb-page),
+        content-text-color: var(--fb-text),
+        container-shape: 0px
+    ));
+    @include mat.toolbar-overrides((
+        container-background-color: var(--fb-component),
+        container-text-color: var(--fb-text),
+        title-text-font: 'Noto Sans'
+    ));
+    @include mat.card-overrides((
+        elevated-container-color: var(--fb-section),
+        elevated-container-elevation: none,
+        filled-container-color: var(--fb-section),
+        outlined-container-color: var(--fb-section),
+        outlined-outline-color: var(--fb-outline)
+    ));
+
+    @include mat.form-field-overrides((
+        filled-container-color: var(--normal-enabled-background-color),
+        filled-input-text-color: var(--fb-text),
+        filled-input-text-placeholder-color: var(--fb-text-secondary),
+        filled-label-text-color: var(--fb-text-secondary),
+        filled-focus-label-text-color: var(--fb-active),
+        filled-focus-active-indicator-color: var(--fb-focus),
+        filled-active-indicator-color: var(--fb-outline),
+        filled-disabled-input-text-color: var(--fb-disabled),
+        filled-disabled-label-text-color: var(--fb-disabled),
+        outlined-input-text-color: var(--fb-text),
+        outlined-input-text-placeholder-color: var(--fb-text-secondary),
+        outlined-label-text-color: var(--fb-text-secondary),
+        outlined-outline-color: var(--fb-outline),
+        outlined-focus-outline-color: var(--fb-focus),
+        outlined-focus-label-text-color: var(--fb-active),
+        container-text-font: 'Noto Sans',
+        outlined-label-text-font: 'Noto Sans',
+        filled-label-text-font: 'Noto Sans'
+    ));
+    @include mat.select-overrides((
+        panel-background-color: var(--fb-context),
+        enabled-trigger-text-color: var(--fb-text),
+        disabled-trigger-text-color: var(--fb-disabled),
+        placeholder-text-color: var(--fb-text-secondary),
+        enabled-arrow-color: var(--fb-text-secondary),
+        focused-arrow-color: var(--fb-focus),
+        trigger-text-font: 'Noto Sans'
+    ));
+    @include mat.tabs-overrides((
+        active-label-text-color: var(--fb-text),
+        inactive-label-text-color: var(--fb-text-secondary),
+        active-indicator-color: var(--fb-selected),
+        active-focus-indicator-color: var(--fb-focus),
+        active-hover-indicator-color: var(--fb-selected),
+        active-focus-label-text-color: var(--fb-text),
+        active-hover-label-text-color: var(--fb-text),
+        inactive-focus-label-text-color: var(--fb-text),
+        inactive-hover-label-text-color: var(--fb-text),
+        pagination-icon-color: var(--fb-text),
+        divider-color: var(--fb-outline),
+        label-text-font: 'Noto Sans',
+        container-height: var(--fb-touch-target)
+    ));
+    @include mat.snack-bar-overrides((
+        container-color: var(--fb-context),
+        supporting-text-color: var(--fb-text),
+        button-color: var(--fb-active),
+        supporting-text-font: 'Noto Sans'
+    ));
+    @include mat.divider-overrides((color: var(--fb-outline)));
+
+    .fb-field, .fb-theme-setting {
+        padding-bottom: var(--fb-panel-padding);
+        min-width: 0;
+    }
+    .fb-field-hint { color: var(--fb-text-secondary); font-size: 12px; }
+    obc-icon-button mat-icon { color: inherit; }
+    obc-icon-button { vertical-align: middle; }
+    // The official menu artwork spans x=4..21 in a 24px viewBox.
+    obc-icon-button > obi-menu {
+        display: block;
+        width: var(--ui-components-icon-button-icon-size);
+        height: var(--ui-components-icon-button-icon-size);
+        transform: translateX(calc(var(--ui-components-icon-button-icon-size) / -48));
+    }
+    .buttonPanel .buttonPanelItem { min-height: var(--fb-touch-target); }
+    .ol-zoom {
+        display: flex;
+        gap: var(--fb-space);
+        height: var(--fb-touch-target);
+    }
+    .alert-list-main {
+        background: var(--fb-context);
+        color: var(--fb-text);
+        border-color: var(--fb-outline);
+        font-family: inherit;
+    }
+    .alert-list, .alert-box { border-color: var(--fb-outline); }
+    .alert-list-main .red-text { color: var(--fb-alarm); }
+    .alert-list-main .amber-text { color: var(--fb-warning); }
+    .statusBarItem .mat-icon {
+        background: var(--fb-context);
+        color: var(--fb-text);
+    }
+
+    body, .theme-page { font-family: inherit; }
+    body, .appframe { background: var(--fb-page); color: var(--fb-text); }
+    .loading { color: var(--fb-text); }
+    .leftMenuPanel { background: var(--fb-component); color: var(--fb-text); }
+    .cdk-overlay-pane { --fb-scroll-track: var(--fb-context); }
+    .mat-mdc-dialog-surface { border: 1px solid var(--fb-outline); }
+    .settings .setting-card {
+        box-shadow: none;
+        border: 0;
+        border-radius: 0;
+        background: var(--fb-section);
+    }
+    .settings .setting-group-title { color: var(--fb-text-secondary); font-family: inherit; }
+    .settings .setting-card-row { gap: var(--fb-space); }
+    .settings .setting-card-row-item { min-width: 0; }
+    .fb-settings-groups {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+        gap: var(--fb-panel-padding);
+        padding-block: var(--fb-panel-padding);
+    }
+    .fb-settings-groups section { min-width: 0; }
+    .fb-settings-groups h3 {
+        margin: 0 0 var(--fb-space);
+        font: inherit;
+        color: var(--fb-text-secondary);
+    }
+    .mat-mdc-menu-item { min-height: var(--fb-touch-target); }
+    .buttonPanel { --fb-scroll-track: transparent; scrollbar-width: thin; }
+
+    *, & {
+        scrollbar-width: thin;
+        scrollbar-color: var(--fb-scroll-thumb) var(--fb-scroll-track);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--fb-scroll-track); }
+    ::-webkit-scrollbar-thumb { background: var(--fb-scroll-thumb); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--fb-scroll-hover); }
+    ::-webkit-scrollbar-thumb:active { background: var(--fb-selected); }
+}
+
+// CDK's absolute content wrapper otherwise grows to the longest resource name.
+.ob-resource-list .cdk-virtual-scroll-content-wrapper {
+    width: 100%;
+}
+
+// Keep controls, weather overlays and alarm layers out of map dimming.
+.ol-layer[class*=" chart-"] { filter: brightness(var(--fb-chart-brightness, 1)); }
+.ol-layer.fb-symbol-layer { filter: brightness(var(--fb-symbol-brightness, 1)); }
+// The existing manual/automatic night-dim command only affects the map.
+html:is([data-obc-theme="day"], [data-obc-theme="bright"]) .app-night .ol-layer[class*=" chart-"] { filter: brightness(min(var(--fb-chart-brightness, 1), .4)); }
+html:is([data-obc-theme="day"], [data-obc-theme="bright"]) .app-night .ol-layer.fb-symbol-layer { filter: brightness(min(var(--fb-symbol-brightness, 1), .6)); }
+.ol-scale-bar, .ol-scale-line {
+  --ol-foreground-color: var(--fb-text);
+  --ol-subtle-foreground-color: var(--fb-text-secondary);
+  --ol-background-color: var(--fb-component);
+  --ol-partial-background-color: var(--fb-component);
+}

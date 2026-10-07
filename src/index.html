@@ -86,13 +86,136 @@
     <!-- ******************** /Device Icons ******************** -->
   </head>
   <body>
-    <app-root>
-      <div class="loading">
-        <img src="./assets/icons/icon-192x192.png" /><br />
-        <div>
-          <b><i>Shift-Reload</i></b> if this screen does not disappear!
-        </div>
-      </div>
+    <app-root
+      ><style>
+        .fb-startup {
+          --start-bg: var(--fb-component, #171a1d);
+          --start-text: var(--fb-text, #d6dce1);
+          --start-muted: var(--fb-text-secondary, #9da7b0);
+          position: fixed;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          background: var(--start-bg);
+          color: var(--start-text);
+          font:
+            14px 'Noto Sans',
+            system-ui,
+            sans-serif;
+          z-index: 9999;
+          padding: 24px;
+          box-sizing: border-box;
+        }
+        .fb-startup main {
+          width: min(100%, 320px);
+          text-align: center;
+        }
+        .fb-startup svg {
+          width: 72px;
+          height: 72px;
+          margin-bottom: 24px;
+          color: var(--start-text);
+        }
+        .fb-startup h1 {
+          font-size: 28px;
+          letter-spacing: 0.04em;
+          font-weight: 500;
+          margin: 0 0 8px;
+        }
+        .fb-startup p {
+          color: var(--start-muted);
+          margin: 0;
+          line-height: 1.6;
+        }
+        .fb-startup .startup-status {
+          margin-top: 36px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 12px;
+          font-size: 13px;
+        }
+        .startup-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid var(--start-muted);
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: startup-spin 1.2s linear infinite;
+        }
+        .fb-startup details {
+          margin-top: 32px;
+          font-size: 12px;
+          color: var(--start-muted);
+        }
+        .fb-startup summary {
+          cursor: pointer;
+          padding: 8px;
+        }
+        .fb-startup details p {
+          max-width: 280px;
+          margin: 8px auto;
+        }
+        .fb-startup footer {
+          position: absolute;
+          bottom: 24px;
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          color: var(--start-muted);
+        }
+        @keyframes startup-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .startup-spinner {
+            animation: none;
+          }
+        }
+        .fb-startup summary:focus-visible {
+          outline: 2px solid currentColor;
+          outline-offset: 2px;
+        }
+      </style>
+      <section class="fb-startup" aria-label="Freeboard loading">
+        <main>
+          <svg viewBox="0 0 72 72" fill="none" aria-hidden="true">
+            <circle
+              cx="36"
+              cy="36"
+              r="32"
+              stroke="currentColor"
+              opacity=".35"
+            />
+            <path
+              d="M36 4V10M36 62V68M4 36H10M62 36H68"
+              stroke="currentColor"
+            />
+            <path
+              d="M36 17L49 51L36 44L23 51Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+            <path d="M36 18V43L24 50Z" fill="currentColor" opacity=".2" />
+          </svg>
+          <h1>Freeboard</h1>
+          <p>Chartplotter for Signal K</p>
+          <div class="startup-status" role="status">
+            <span class="startup-spinner" aria-hidden="true"></span>Starting
+            Freeboard…
+          </div>
+          <details>
+            <summary>Taking longer than expected?</summary>
+            <p>
+              Check your connection to the Signal K server, then reload this
+              page.
+            </p>
+          </details>
+        </main>
+        <footer>SIGNAL K</footer>
+      </section>
     </app-root>
   </body>
 </html>

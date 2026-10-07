@@ -71,28 +71,40 @@ describe('isPositionStale (#672)', () => {
 // exactly, so a list without it leaves every target in the "unknown" colour
 // no matter how often it broadcasts its static report.
 describe('SKStreamFacade.subscribe — what the stream asks for', () => {
-  interface Subscription {
+  interface PostedMessage {
     cmd: string;
-    options: { context: string; path: { path: string }[] };
+    options: {
+      context?: string;
+      path?: { path: string }[];
+      config?: Record<string, unknown>;
+    };
   }
 
-  const subscriptionsPosted = (): Subscription[] => {
-    const posted: Subscription[] = [];
+  const subscriptionsPosted = (): PostedMessage[] => {
+    const posted: PostedMessage[] = [];
     const facade = Object.create(SKStreamFacade.prototype) as unknown as {
-      worker: { postMessage: (msg: Subscription) => void };
+      app: { config: Record<string, unknown> };
+      worker: { postMessage: (msg: PostedMessage) => void };
       subscribe: () => void;
     };
+    facade.app = { config: { signalk: { vessels: true, maxRadius: 20000 } } };
     facade.worker = { postMessage: (msg) => posted.push(msg) };
     facade.subscribe();
     return posted;
   };
+
+  it('applies worker settings before asking the server to replay cached targets', () => {
+    const posted = subscriptionsPosted();
+    expect(posted[0]).toMatchObject({ cmd: 'settings' });
+    expect(posted.findIndex((message) => message.cmd === 'subscribe')).toBeGreaterThan(0);
+  });
 
   it('asks every vessel for its ship type', () => {
     const vessels = subscriptionsPosted().find(
       (s) => s.cmd === 'subscribe' && s.options.context === 'vessels.*'
     );
     expect(vessels).toBeDefined();
-    expect(vessels?.options.path.map((p) => p.path)).toContain(
+    expect(vessels?.options.path?.map((p) => p.path)).toContain(
       'design.aisShipType'
     );
   });

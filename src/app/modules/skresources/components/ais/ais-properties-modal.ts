@@ -11,7 +11,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 
 import { AppFacade } from 'src/app/app.facade';
 import { SKVessel } from 'src/app/modules/skresources/resource-classes';
-import { getAisIcon } from 'src/app/modules/icons';
+import { aisVesselTypeLabel, getAisIcon } from 'src/app/modules/icons';
 
 @Component({
   selector: 'ap-ais-modal',
@@ -66,14 +66,12 @@ import { getAisIcon } from 'src/app/modules/icons';
         </mat-card-header>
         <mat-card-content>
           <div style="display:flex;flex-direction: column;">
-            @if (data.target.type?.name) {
-              <div style="display:flex;">
-                <div class="key-label">Type:</div>
-                <div style="flex: 1 1 auto;">
-                  {{ data.target.type?.name }}
-                </div>
+            <div style="display:flex;">
+              <div class="key-label">Type:</div>
+              <div style="flex: 1 1 auto;">
+                {{ vesselTypeLabel }}
               </div>
-            }
+            </div>
             @if (data.target.flag) {
               <div style="display:flex;">
                 <div class="key-label">Flag:</div>
@@ -184,6 +182,7 @@ import { getAisIcon } from 'src/app/modules/icons';
 })
 export class AISPropertiesModal {
   protected flagIcon: string;
+  protected readonly vesselTypeLabel: string;
   protected showFlag = signal<boolean>(true);
   protected display: Record<
     'length' | 'beam' | 'airHeight' | 'draftMax' | 'draftCurrent',
@@ -204,6 +203,7 @@ export class AISPropertiesModal {
   }>(MAT_BOTTOM_SHEET_DATA);
 
   constructor() {
+    this.vesselTypeLabel = aisVesselTypeLabel(this.data.target.type);
     this.flagIcon = `${this.app.hostDef.url}/signalk/v2/api/resources/flags/mmsi/${this.data.target.mmsi}`;
     this.display = {
       length: this.app.formatValueForDisplay(

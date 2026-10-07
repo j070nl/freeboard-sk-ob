@@ -1,3 +1,4 @@
+import { normalizeThemePreference } from './lib/theme/theme';
 import {
   FBAppData,
   IAppConfig,
@@ -109,6 +110,10 @@ export function cleanConfig(
       settings.display.statusBar.tapFadeSpeed = DEFAULT_TAP_FADE_SPEED;
     }
   }
+
+  settings.display.darkMode.source = normalizeThemePreference(
+    settings.display.darkMode.source
+  );
 
   if (typeof settings.units.temperature === 'undefined') {
     settings.units.temperature = 'C';

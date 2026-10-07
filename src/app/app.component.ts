@@ -1,5 +1,12 @@
+import '@oicl/openbridge-webcomponents/dist/icons/icon-palette-day-night-iec.js';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-settings-iec.js';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-more-vertical-google.js';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-edit-google.js';
+import '@oicl/openbridge-webcomponents/dist/icons/icon-menu.js';
+import { OpenBridgeControlDirective } from './lib/components/openbridge/control.directive';
 import {
   Component,
+  CUSTOM_ELEMENTS_SCHEMA,
   HostListener,
   ViewChild,
   computed,
@@ -12,7 +19,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { GPXExportService } from 'src/app/modules/gpx/gpx-export.service';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { OverlayContainer } from '@angular/cdk/overlay';
+import { MapAppearanceService } from './lib/theme/map-appearance.service';
+import { ThemeService } from './lib/theme/theme.service';
 
 import { CommonModule } from '@angular/common';
 import { MatBadgeModule } from '@angular/material/badge';
@@ -129,9 +137,11 @@ const TRACK_API_NOTICE_KEY = 'fb-track-api-notice-dismissed';
 
 @Component({
   selector: 'app-root',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
   imports: [
+    OpenBridgeControlDirective,
     MatMenuModule,
     MatSidenavModule,
     MatBadgeModule,
@@ -268,7 +278,14 @@ export class AppComponent {
   protected skresOther = inject(FBCustomResourceService);
   protected signalk = inject(SignalKClient);
   private dom = inject(DomSanitizer);
-  private overlayContainer = inject(OverlayContainer);
+  protected readonly theme = inject(ThemeService);
+  protected readonly quickThemes = [
+    { value: 'bright', label: 'Bright' },
+    { value: 'day', label: 'Day' },
+    { value: 'dusk', label: 'Dusk' },
+    { value: 'night', label: 'Night' }
+  ] as const;
+  protected readonly mapAppearance = inject(MapAppearanceService);
   private bottomSheet = inject(MatBottomSheet);
   private dialog = inject(MatDialog);
   protected wakeLock = inject(WakeLockService);
@@ -587,26 +604,13 @@ export class AppComponent {
 
   /** ************* */
 
-  private darkThemeApplied: boolean;
   private setDarkTheme() {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const enabled =
-      (this.app.config.display.darkMode.source === 0 && mq.matches) ||
-      (this.app.config.display.darkMode.source === 1 &&
-        this.app.data.vessels.self.environment.mode === 'night') ||
-      this.app.config.display.darkMode.source === -1;
-    // called on every realtime delta — skip the DOM work when unchanged
-    if (enabled === this.darkThemeApplied) {
-      return;
-    }
-    this.darkThemeApplied = enabled;
-    const el = this.overlayContainer.getContainerElement();
-    if (enabled) {
-      el.classList.add('dark-theme');
-    } else {
-      el.classList.remove('dark-theme');
-    }
-    this.app.config.display.darkMode.enabled = enabled;
+    this.theme.update(
+      this.app.config.display.darkMode.source,
+      this.app.data.vessels.self.environment.mode
+    );
+    this.app.config.display.darkMode.enabled =
+      this.theme.theme() === 'dusk' || this.theme.theme() === 'night';
   }
 
   private formatInstrumentsUrl() {

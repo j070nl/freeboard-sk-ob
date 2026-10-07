@@ -96,6 +96,18 @@ describe('okToRenderTarget — Buddies only filter (#478)', () => {
     expect(c.okToRenderTarget('b')).toBe(false);
   });
 
+  it('keeps missing and invalid vessel types in Unspecified rather than Pleasure', () => {
+    for (const type of [{ id: -1, name: '' }, { id: 0, name: 'Pleasure' }]) {
+      const unknown = vessel({ type });
+      const c = component({
+        targets: new Map([['unknown', unknown]]),
+        filterByShipType: true,
+        filterShipTypes: [10]
+      });
+      expect(c.okToRenderTarget('unknown')).toBe(true);
+    }
+  });
+
   it('ANDs with the ship-type filter', () => {
     const buddyCargo = vessel({ buddy: true, type: { id: 70, name: 'Cargo' } });
     const strangerCargo = vessel({

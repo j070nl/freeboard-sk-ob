@@ -17,7 +17,7 @@ import { Layer } from 'ol/layer';
 import { Feature } from 'ol';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import { Style, Fill, Text } from 'ol/style';
+import { Style, Fill, Text, Stroke } from 'ol/style';
 import { MapComponent } from './map.component';
 import { Extent } from './models';
 import { AsyncSubject } from 'rxjs';
@@ -34,6 +34,7 @@ export class FBFeatureLayerComponent implements OnInit, OnDestroy, OnChanges {
   public source: VectorSource;
   protected theme = LightTheme;
   protected labelPrefixes = [];
+  protected labelFont?: string;
 
   /**
    * This event is triggered after the layer is initialized
@@ -63,7 +64,10 @@ export class FBFeatureLayerComponent implements OnInit, OnDestroy, OnChanges {
   ngOnInit() {
     this.source = new VectorSource();
     this.layer = new VectorLayer(
-      Object.assign(this, { ...this.layerProperties })
+      Object.assign(this, {
+        ...this.layerProperties,
+        className: 'ol-layer fb-symbol-layer'
+      })
     );
 
     this.theme = this.darkMode ? DarkTheme : LightTheme;
@@ -193,7 +197,9 @@ export class FBFeatureLayerComponent implements OnInit, OnDestroy, OnChanges {
     }
     if (ts) {
       ts.setText(Math.abs(this.mapZoom) >= this.labelMinZoom ? text : '');
+      if (this.labelFont) ts.setFont(this.labelFont);
       ts.setFill(new Fill({ color: this.theme.labelText.color }));
+      ts.setStroke(new Stroke({ color: this.theme.labelText.halo, width: 3 }));
       if (Array.isArray(style)) {
         style[0].setText(ts);
       } else {

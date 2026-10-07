@@ -92,7 +92,10 @@ export class BearingLineComponent implements OnInit, OnDestroy, OnChanges {
     this.parseValues();
     this.source = new VectorSource({ features: this.features });
     this.layer = new VectorLayer(
-      Object.assign(this, { ...this.layerProperties })
+      Object.assign(this, {
+        ...this.layerProperties,
+        className: 'ol-layer fb-symbol-layer'
+      })
     );
 
     const map = this.mapComponent.getMap();

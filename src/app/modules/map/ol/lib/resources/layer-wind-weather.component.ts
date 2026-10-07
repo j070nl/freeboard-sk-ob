@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  effect,
   Input,
   OnChanges,
   OnDestroy,
@@ -28,6 +29,7 @@ import {
   WeatherService,
   WeatherWindSample
 } from 'src/app/modules/weather/weather.service';
+import { ThemeService } from 'src/app/lib/theme/theme.service';
 import { AppFacade } from 'src/app/app.facade';
 import { WindIndicator } from 'src/app/types';
 import { meteoWindBucket } from 'src/app/modules/icons';
@@ -58,9 +60,14 @@ export class LayerWindWeatherComponent implements OnChanges, OnDestroy {
     private weather: WeatherService,
     private mapImages: MapImageRegistry,
     private app: AppFacade,
+    private theme: ThemeService,
     changeDetectorRef: ChangeDetectorRef
   ) {
     changeDetectorRef.detach();
+    effect(() => {
+      this.theme.theme();
+      this.layer?.changed();
+    });
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -229,15 +236,17 @@ export class LayerWindWeatherComponent implements OnChanges, OnDestroy {
   // Wind speed shown for both indicators — the label is always displayed, in the
   // user's configured wind-speed units.
   private speedLabel(speedMs: number, offsetY: number) {
+    const palette = this.theme.theme();
+    const dark = palette === 'dusk' || palette === 'night';
     return new Text({
       text: this.app.formatValueForDisplay(speedMs, 'm/s', {
         precision: 0,
         path: this.app.twsDisplayUnitPath()
       }),
       offsetY,
-      font: '11px Roboto, Arial, sans-serif',
-      fill: new Fill({ color: 'rgba(20, 60, 95, 0.95)' }),
-      stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.9)', width: 3 })
+      font: '600 13px "Noto Sans", Arial, sans-serif',
+      fill: new Fill({ color: dark ? '#e0c99f' : '#25323b' }),
+      stroke: new Stroke({ color: dark ? '#151b20' : '#edf1f4', width: 3 })
     });
   }
 }
