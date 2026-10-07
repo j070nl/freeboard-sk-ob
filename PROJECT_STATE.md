@@ -1,5 +1,23 @@
 # Project state
 
+## Standalone Freeboard OpenBridge ACTIVE — 2026-10-07
+
+Own package `@j070nl/freeboard-openbridge` **3.2.1-openbridge.2**, source 7d6884f7,
+branch openbridge/standalone. Canonical URL `/@j070nl/freeboard-openbridge/`;
+old URL redirects, so SKIP/browser keys/profiles remain compatible. Helper ID
+freeboard-sk and profile ID freeboard retained. One Freeboard app discovered.
+Both stock packages (user 3.1.1 and server-bundled 2.24.2) archived outside discovery;
+root dependency replaced and stock server optional dependency removed. Two short
+Signal K restarts; PyPilot PID unchanged. No server JS, SKIP files or credentials
+changed. 23 checked profile/resource/helper-config files unchanged.
+3139 installed package files and 538 HTTP assets verified; old/new HTTPS checked.
+21 helper + 18 UI tests, full build, lint and packed-helper check pass. Archive
+restoration checked for 610 user-package files plus global 428 files/one symlink;
+operational rollback and field tests not performed. No new off-Pi receipt claimed.
+Next: user reload/field check. Signal K upgrades may reintroduce stock Freeboard;
+use the read-only check-active.mjs in the maintained source after server upgrades.
+[Release, exact rollback and caveats](/home/pi/openplotter-project/releases/2026-10-07_121845_freeboard-standalone/README.md).
+
 ## Freeboard OpenBridge 3.2.1 LIVE — 2026-10-07
 
 User-authorized static frontend deployment from integration commit 53ace85a.
