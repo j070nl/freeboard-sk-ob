@@ -1,5 +1,22 @@
 # Project state
 
+## Standalone Freeboard OpenBridge ACTIVE — 2026-10-07
+
+Installed @j070nl/freeboard-openbridge 3.2.1-openbridge.2, code commit 7d6884f7,
+branch openbridge/standalone. Canonical /@j070nl/freeboard-openbridge/; legacy URL
+307-redirect preserves SKIP. One own webapp verified; both local stock 3.1.1 and
+server-bundled stock 2.24.2 archived outside module discovery. Removed only the
+stock optional dependency from server package metadata; no server code patched.
+Existing helper ID freeboard-sk/profile ID freeboard retained. Two short Signal K
+restarts were needed after discovering the global fallback; PyPilot PID unchanged.
+3139 package files and 538 HTTP assets verified, both HTTPS routes verified;
+23 helper/profile/resource files unchanged. 21 helper and 18 selected UI tests,
+full build, packed-helper load and lint passed. No field test or production rollback.
+[Release/rollback](/home/pi/openplotter-project/releases/2026-10-07_121845_freeboard-standalone/README.md).
+Next: operator reload/field check. After Signal K updates run
+`node dev-tools/openbridge-release/check-active.mjs` to catch stock reintroduction.
+Earlier source/package/deployment identities below are historical.
+
 ## Standalone package prepared — 2026-10-07
 
 Branch openbridge/standalone; @j070nl/freeboard-openbridge 3.2.1-openbridge.2.
