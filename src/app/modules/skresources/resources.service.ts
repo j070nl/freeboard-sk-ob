@@ -108,6 +108,11 @@ import {
   chartTimeline,
   isChartTimeInstant
 } from 'src/app/lib/chart-time';
+import { promoteTemporaryRoute } from 'src/app/modules/course/temporary-route';
+import {
+  withPointNames,
+  type PointMeta
+} from './components/route-reorder.util';
 
 export type SKResourceType =
   'routes' | 'waypoints' | 'regions' | 'notes' | 'charts' | 'tracks';
@@ -2385,10 +2390,7 @@ export class SKResourceService {
    * @param coordinates Route points
    * @param meta Route point metadata.
    */
-  public newRouteAt(
-    coordinates: LineString,
-    meta?: Array<{ href?: string; name?: string }>
-  ) {
+  public newRouteAt(coordinates: LineString, meta?: PointMeta[]) {
     if (!coordinates) {
       return;
     }
@@ -2492,6 +2494,9 @@ export class SKResourceService {
       .afterClosed()
       .subscribe((r: { save: boolean; route: SKRoute }) => {
         if (r.save) {
+          // Saving it under a name keeps it: a temporary route becomes an
+          // ordinary one.
+          promoteTemporaryRoute(r.route);
           this.putToServer('routes', id, r.route).catch((err) =>
             this.app.parseHttpErrorResponse(err)
           );
@@ -2576,7 +2581,8 @@ export class SKResourceService {
     rte.distance = GeoUtils.routeLength(rte.feature.geometry.coordinates);
 
     if (coordsMeta) {
-      rte['feature']['properties']['coordinatesMeta'] = coordsMeta;
+      rte['feature']['properties']['coordinatesMeta'] =
+        withPointNames(coordsMeta);
     }
     // Resolves true on success, false on failure (the error is surfaced here);
     // callers that only fire-and-forget can ignore the result.

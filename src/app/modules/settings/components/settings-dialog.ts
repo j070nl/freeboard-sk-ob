@@ -56,6 +56,7 @@ import {
   clampCenterOffset
 } from 'src/app/lib/follow-offset';
 import { RadarAPIService, SKRadar } from '../../radar/radar-api.service';
+import { CourseService } from 'src/app/modules/course/course.service';
 import { IAppConfig } from 'src/app/types';
 
 interface PreferredPathsResult {
@@ -132,6 +133,7 @@ export class SettingsDialog implements OnInit {
   protected radarList = signal<SKRadar[]>([]);
 
   private saveOnClose = false;
+  private arrivalCircleChanged = false;
 
   protected facade = inject(SettingsFacade);
   protected myElement = inject(ElementRef);
@@ -142,6 +144,7 @@ export class SettingsDialog implements OnInit {
   protected readonly theme = inject(ThemeService);
   protected readonly mapAppearance = inject(MapAppearanceService);
   protected radarApi = inject(RadarAPIService);
+  private course = inject(CourseService);
 
   constructor() {
     this.options = new SettingsOptions();
@@ -200,6 +203,9 @@ export class SettingsDialog implements OnInit {
   handleClose() {
     if (this.saveOnClose) {
       this.persistModel();
+    }
+    if (this.arrivalCircleChanged) {
+      this.applyArrivalCircle();
     }
     this.dialogRef.close();
   }
@@ -270,6 +276,26 @@ export class SettingsDialog implements OnInit {
   parseCenterOffset(e: NgModel) {
     e.reset(typeof e.model === 'number' ? clampCenterOffset(e.model) : 0);
     this.persistModel();
+  }
+
+  /**
+   * The arrival circle is sent with every course Freeboard starts, so a
+   * course already being followed keeps the old one unless it is set there
+   * too. That is done once, when the dialog closes: a number input fires
+   * `change` on every spinner step.
+   */
+  protected onArrivalCircleChange(e: NgModel) {
+    this.parseNumber(e);
+    this.arrivalCircleChanged = true;
+  }
+
+  /** Set a changed arrival circle on the course being followed. */
+  private applyArrivalCircle() {
+    const radius = this.facade.settings.course.arrivalCircle;
+    const course = this.course.courseData();
+    if (course.position && radius > 0 && radius !== course.arrivalCircle) {
+      this.course.setArrivalCircle(radius);
+    }
   }
 
   /**

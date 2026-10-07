@@ -4,18 +4,27 @@
  * The v2 Track API keeps the own vessel's track indefinitely (tracks-plugin v3
  * default) and other vessels' for 30 days. A single-context query may omit the
  * time window, which returns that vessel's whole history; a `bbox` then
- * *selects* passages touching the viewport (it never clips them), and with no
- * `epsilon` the provider picks a simplification tolerance suited to the box, so
- * the viewport doubles as the level-of-detail control.
+ * *selects* passages touching the viewport (it never clips them). Detail is
+ * set by an explicit `epsilon` of about one screen pixel's ground distance, so
+ * zooming in refetches at finer detail. Providers don't size a tolerance to the
+ * box themselves (SignalK/signalk-server#3081), and `simplify` alone derives
+ * one from the whole track, far too coarse once zoomed in.
  *
  * Pure helpers (no Angular, no state) so they can be unit tested directly.
  * v2 only: the v1 routes have no equivalent.
  */
 
 import { Position } from 'src/app/types';
+import {
+  lonSpan,
+  MERCATOR_RESOLUTION_Z0,
+  mercatorMidLatitude,
+  type LonLatBox
+} from 'src/app/lib/map-fit';
 import { queryString } from './track-source';
 
-/** Points per history track, at every zoom level. */
+/** Most points per history track, at every zoom level: the budget cap on top
+ * of the per-view `epsilon`. */
 export const HISTORY_MAX_POINTS = 5000;
 
 /** Start of time, for a window that is open at the start but bounded at the
@@ -74,27 +83,75 @@ export interface HistoryRequest {
   /** Viewport box `[w, s, e, n]`, as `viewportBbox()` returns it. */
   bbox: [number, number, number, number] | null;
   range: HistoryRange;
+  /** Simplification tolerance in metres, as `historyEpsilon()` returns it. */
+  epsilon?: number | null;
   provider?: string;
 }
 
-/** Query string for one vessel's history in the viewport. No `epsilon`: with a
- * `bbox` the provider picks a tolerance for the box size, so zooming in
- * refetches at finer detail. `times` carries each point's recording time,
- * which a tapped segment's time span is read from. */
+/** The simplification tolerance for a view: one screen pixel's ground distance
+ * in metres at the view's centre latitude (Web Mercator shrinks a pixel by the
+ * cosine of the latitude). Anything finer than a pixel cannot be seen, so this
+ * drops only invisible detail.
+ *
+ * The pixel is taken at the deepest zoom of the current level, not the zoom
+ * itself: history is refetched only when the level changes, so zooming in
+ * within the level would otherwise stretch the tolerance to nearly two pixels.
+ *
+ * `extent` is the lon/lat `[w, s, e, n]` viewport; its centre latitude is the
+ * Mercator midpoint of `s` and `n`, which is where the view is centred (the
+ * plain average sits well south of it in a wide northern view). `null` when
+ * the view gives no usable zoom or extent. */
+export function historyEpsilon(
+  zoom: number,
+  extent: number[] | undefined
+): number | null {
+  if (!Number.isFinite(zoom) || !Array.isArray(extent) || extent.length !== 4) {
+    return null;
+  }
+  const lat = mercatorMidLatitude(extent[1], extent[3]);
+  if (!Number.isFinite(lat)) {
+    return null;
+  }
+  const level = Math.floor(zoom) + 1;
+  const metres =
+    (MERCATOR_RESOLUTION_Z0 / Math.pow(2, level)) *
+    Math.cos((lat * Math.PI) / 180);
+  // three significant figures keep the query short; a tolerance that rounds
+  // away to nothing is not one the API accepts
+  const rounded = Number(metres.toPrecision(3));
+  return rounded > 0 ? rounded : null;
+}
+
+/** Query string for one vessel's history in the viewport. `epsilon` sets the
+ * detail for the view and `maxPoints` caps it, so zooming in refetches at
+ * finer detail. `times` carries each point's recording time, which a tapped
+ * segment's time span is read from. */
 export function historyQuery(req: HistoryRequest): string {
   return queryString({
     context: req.context,
     ...rangeParams(req.range),
     bbox: req.bbox ? req.bbox.join(',') : undefined,
+    epsilon: req.epsilon ?? undefined,
     maxPoints: HISTORY_MAX_POINTS,
     times: 'true',
     provider: req.provider
   });
 }
 
-/** Query string for a vessel's recorded span only: metadata, no geometry. */
-export function historyMetaQuery(context: string, provider?: string): string {
-  return queryString({ context, geometry: 'false', provider });
+/** Query string for a vessel's recorded span only: metadata, no geometry.
+ * With a `range` it is the span and extent of what that range holds; without
+ * one, of the whole record. */
+export function historyMetaQuery(
+  context: string,
+  provider?: string,
+  range: HistoryRange = HISTORY_ALL
+): string {
+  return queryString({
+    context,
+    ...rangeParams(range),
+    geometry: 'false',
+    provider
+  });
 }
 
 /** Query string for `/tracks/contexts`: every context with any recorded track.
@@ -121,6 +178,7 @@ interface HistoryFeatureLike {
     contextName?: string;
     from?: string;
     to?: string;
+    bbox?: unknown;
     pointCount?: number;
     coordTimes?: string[][];
   };
@@ -206,16 +264,29 @@ export function parseTimedTracks(
   return result;
 }
 
-/** A vessel's recorded span (ms) from a `geometry=false` response, and the
- * name the provider recorded for it (useful once the vessel has left AIS
- * range and the app no longer holds it). */
+/** A vessel's recorded span from a `geometry=false` response. */
+export interface HistorySpan {
+  /** First and last recorded point, in ms. */
+  from: number;
+  to: number;
+  /** The name the provider recorded (useful once the vessel has left AIS
+   * range and the app no longer holds it). */
+  name?: string;
+  /** Where the recorded track lies, union-ed across the provider's features;
+   * absent when the provider sent none. */
+  bbox?: HistoryBbox;
+}
+
+/** A vessel's recorded span (ms), name and extent from a `geometry=false`
+ * response. */
 export function parseHistorySpan(
   fc: unknown,
   preferredProvider?: string
-): { from: number; to: number; name?: string } | undefined {
+): HistorySpan | undefined {
   let from = Infinity;
   let to = -Infinity;
   let name: string | undefined;
+  let bbox: HistoryBbox | undefined;
   oneProvider(featuresOf(fc), preferredProvider).forEach((f) => {
     const a = Date.parse(f.properties?.from ?? '');
     const b = Date.parse(f.properties?.to ?? '');
@@ -224,8 +295,72 @@ export function parseHistorySpan(
       to = Math.max(to, b);
     }
     name = name ?? f.properties?.contextName;
+    const box = validBbox(f.properties?.bbox);
+    if (box) {
+      bbox = bbox ? unionBbox(bbox, box) : box;
+    }
   });
-  return Number.isFinite(from) ? { from, to, name } : undefined;
+  if (!Number.isFinite(from)) {
+    return undefined;
+  }
+  return bbox ? { from, to, name, bbox } : { from, to, name };
+}
+
+// ******** extent: zooming to a recorded track ********
+
+/** A box `[west, south, east, north]` in degrees. `west > east` crosses the
+ * antimeridian and is read the short way round, as the Track API sends it:
+ * `[175, -20, -175, -10]` is a box around Fiji, not a band round the world. */
+export type HistoryBbox = LonLatBox;
+
+/** A box as the Track API sent it, or undefined when it isn't one. */
+export function validBbox(b: unknown): HistoryBbox | undefined {
+  if (
+    !Array.isArray(b) ||
+    b.length !== 4 ||
+    !b.every((v) => typeof v === 'number' && Number.isFinite(v))
+  ) {
+    return undefined;
+  }
+  const [w, s, e, n] = b as number[];
+  const lonOk = (v: number) => v >= -180 && v <= 180;
+  const latOk = (v: number) => v >= -90 && v <= 90;
+  if (!lonOk(w) || !lonOk(e) || !latOk(s) || !latOk(n) || s > n) {
+    return undefined;
+  }
+  return [w, s, e, n];
+}
+
+/** The smallest box holding both boxes. Longitudes are arcs on a circle, so
+ * the union is the shorter of the two arcs that start at one box's west edge
+ * and run east far enough to take in the other; it crosses the antimeridian
+ * (`west > east`) when that is the short way round. */
+export function unionBbox(a: HistoryBbox, b: HistoryBbox): HistoryBbox {
+  const arc = (from: HistoryBbox, other: HistoryBbox) => {
+    const offset = lonSpan(from[0], other[0]) % 360;
+    return Math.max(
+      lonSpan(from[0], from[2]),
+      offset + lonSpan(other[0], other[2])
+    );
+  };
+  const viaA = arc(a, b);
+  const viaB = arc(b, a);
+  const south = Math.min(a[1], b[1]);
+  const north = Math.max(a[3], b[3]);
+  const [west, span] = viaA <= viaB ? [a[0], viaA] : [b[0], viaB];
+  if (span >= 360) {
+    return [-180, south, 180, north];
+  }
+  const east = west + span > 180 ? west + span - 360 : west + span;
+  return [west, south, east, north];
+}
+
+/** The union of several boxes; undefined when there are none. */
+export function unionBboxes(boxes: HistoryBbox[]): HistoryBbox | undefined {
+  return boxes.reduce<HistoryBbox | undefined>(
+    (u, b) => (u ? unionBbox(u, b) : b),
+    undefined
+  );
 }
 
 /** The contexts listed by `/tracks/contexts`. */

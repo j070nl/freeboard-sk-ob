@@ -6,6 +6,7 @@ import {
   HISTORY_MAX_POINTS,
   historyAxis,
   historyContextsQuery,
+  historyEpsilon,
   historyMetaQuery,
   historyQuery,
   loopToRange,
@@ -25,7 +26,10 @@ import {
   segmentTimeInfo,
   trackTimeInfo,
   joinStretches,
-  TrailStamps
+  TrailStamps,
+  unionBbox,
+  unionBboxes,
+  validBbox
 } from './track-history';
 
 const MIN = 60000;
@@ -60,12 +64,65 @@ describe('track-history ranges', () => {
   });
 });
 
+describe('historyEpsilon', () => {
+  const box = (lat: number) => [-82, lat - 0.5, -81, lat + 0.5];
+
+  it('is one Web Mercator pixel on the ground, in metres, a level in', () => {
+    // zoom 0 on the equator: the equator's length over a 256-pixel tile, a
+    // level deeper
+    expect(historyEpsilon(0, box(0))).toBe(78300);
+    // a pixel covers half the ground at 60 degrees
+    expect(historyEpsilon(1, box(60))).toBe(19600);
+  });
+
+  it('follows the zoom level: coarse zoomed out, fine in a harbour', () => {
+    expect(historyEpsilon(6, box(24.5))).toBe(1110);
+    expect(historyEpsilon(16, box(24.5))).toBe(1.09);
+    // each level in halves the tolerance
+    expect(
+      historyEpsilon(13, box(24.5)) / historyEpsilon(12, box(24.5))
+    ).toBeCloseTo(0.5, 2);
+  });
+
+  it('holds within a level, where no refetch happens, at no more than a pixel', () => {
+    // zooming 12.0 -> 12.9 keeps the fetched track, so its tolerance must
+    // already suit 12.9
+    expect(historyEpsilon(12.9, box(24.5))).toBe(historyEpsilon(12, box(24.5)));
+    expect(historyEpsilon(12, box(24.5))).toBeCloseTo(
+      historyEpsilon(13, box(24.5)) * 2,
+      1
+    );
+  });
+
+  it('reads the latitude at the Mercator centre of the view', () => {
+    // a wide northern view: the plain average (55) is well south of the
+    // centre (58)
+    const wide = historyEpsilon(3, [0, 40, 10, 70]);
+    expect(wide).toBe(historyEpsilon(3, [0, 57.5, 10, 58.5]));
+    expect(wide).toBeLessThan(historyEpsilon(3, [0, 54.5, 10, 55.5]));
+    // clamped to the projection's usable range
+    expect(historyEpsilon(18, [0, 88, 1, 90])).toBe(
+      historyEpsilon(18, [0, 86, 1, 89])
+    );
+    expect(historyEpsilon(18, [0, 88, 1, 90])).toBeGreaterThan(0);
+  });
+
+  it('is null without a usable zoom or extent, or once it rounds to nothing', () => {
+    expect(historyEpsilon(NaN, box(24.5))).toBeNull();
+    expect(historyEpsilon(12, undefined)).toBeNull();
+    expect(historyEpsilon(12, [0, 0])).toBeNull();
+    expect(historyEpsilon(12, [0, NaN, 1, 1])).toBeNull();
+    expect(historyEpsilon(2000, box(24.5))).toBeNull();
+  });
+});
+
 describe('track-history queries', () => {
-  it('asks for one vessel in the viewport, bounded, with times and no epsilon', () => {
+  it('asks for one vessel in the viewport at a detail for the view, capped, with times', () => {
     const p = params(
       historyQuery({
         context: 'self',
         bbox: [-82, 24, -81, 25],
+        epsilon: 17.4,
         range: HISTORY_ALL,
         provider: 'tracks'
       })
@@ -73,6 +130,7 @@ describe('track-history queries', () => {
     expect(p).toEqual({
       context: 'self',
       bbox: '-82,24,-81,25',
+      epsilon: '17.4',
       maxPoints: String(HISTORY_MAX_POINTS),
       times: 'true',
       provider: 'tracks'
@@ -91,13 +149,28 @@ describe('track-history queries', () => {
     expect(p.bbox).toBe('170,-20,-170,-10');
     expect(p.from).toBe(new Date(NOW - 7 * DAY).toISOString());
     expect(p.to).toBeUndefined();
+    // without an epsilon none is sent, and never a bare simplify
     expect(p.epsilon).toBeUndefined();
+    expect(p.simplify).toBeUndefined();
     expect(p.provider).toBeUndefined();
   });
 
   it('asks for metadata only when probing a recorded span', () => {
     expect(params(historyMetaQuery('self', 'tracks'))).toEqual({
       context: 'self',
+      geometry: 'false',
+      provider: 'tracks'
+    });
+  });
+
+  it('asks for the metadata of a selected range', () => {
+    expect(
+      params(
+        historyMetaQuery('self', 'tracks', { from: NOW - 7 * DAY, to: null })
+      )
+    ).toEqual({
+      context: 'self',
+      from: new Date(NOW - 7 * DAY).toISOString(),
       geometry: 'false',
       provider: 'tracks'
     });
@@ -549,5 +622,84 @@ describe('track-history joinStretches', () => {
     });
     expect(j.lines).toHaveLength(2);
     expect(joinStretches({ lines: [], times: [] }, a).lines).toEqual(a.lines);
+  });
+});
+
+describe('track-history extent (zoom to a recorded track)', () => {
+  const meta = (providerId: string, bbox: unknown) => ({
+    geometry: null,
+    properties: {
+      providerId,
+      from: '2026-09-17T00:00:00Z',
+      to: '2026-09-20T00:00:00Z',
+      bbox
+    }
+  });
+
+  it('keeps the recorded bbox, union-ed across features of one provider', () => {
+    const span = parseHistorySpan(
+      {
+        features: [
+          meta('tracks', [-82, 24, -81, 25]),
+          meta('tracks', [-80, 23, -79.5, 24.5]),
+          meta('other', [100, 0, 101, 1])
+        ]
+      },
+      'tracks'
+    );
+    expect(span.bbox).toEqual([-82, 23, -79.5, 25]);
+  });
+
+  it('keeps a bbox crossing the antimeridian the short way round', () => {
+    const span = parseHistorySpan({
+      features: [meta('tracks', [178, -18, -179, -16])]
+    });
+    expect(span.bbox).toEqual([178, -18, -179, -16]);
+    // a second passage further east stays on the short side
+    const both = parseHistorySpan({
+      features: [
+        meta('tracks', [178, -18, -179, -16]),
+        meta('tracks', [-178, -17, -177, -15])
+      ]
+    });
+    expect(both.bbox).toEqual([178, -18, -177, -15]);
+  });
+
+  it('ignores a missing or malformed bbox', () => {
+    expect(
+      parseHistorySpan({ features: [meta('tracks', undefined)] }).bbox
+    ).toBeUndefined();
+    expect(validBbox([1, 2, 3])).toBeUndefined();
+    expect(validBbox([1, 2, 3, 'x'])).toBeUndefined();
+    expect(validBbox([-190, 0, 0, 1])).toBeUndefined();
+    expect(validBbox([0, 10, 1, 5])).toBeUndefined(); // south above north
+    expect(validBbox([0, 0, 1, 1])).toEqual([0, 0, 1, 1]);
+  });
+
+  it('unions boxes as arcs of longitude', () => {
+    // disjoint, same side
+    expect(unionBbox([0, 0, 10, 1], [20, 2, 30, 3])).toEqual([0, 0, 30, 3]);
+    // one inside the other
+    expect(unionBbox([0, 0, 30, 1], [10, 0, 20, 1])).toEqual([0, 0, 30, 1]);
+    // either side of the antimeridian: the short way is across it
+    expect(unionBbox([170, 0, 175, 1], [-175, 0, -170, 1])).toEqual([
+      170, 0, -170, 1
+    ]);
+    // either side of Greenwich: the short way is not
+    expect(unionBbox([-10, 0, -5, 1], [5, 0, 10, 1])).toEqual([-10, 0, 10, 1]);
+    // one box wrapping round the other's west edge
+    expect(unionBbox([0, 0, 10, 1], [-10, 0, 5, 1])).toEqual([-10, 0, 10, 1]);
+    // together they cover every longitude
+    expect(unionBbox([-180, 0, 0, 1], [0, 0, 180, 1])).toEqual([
+      -180, 0, 180, 1
+    ]);
+    expect(unionBboxes([])).toBeUndefined();
+    expect(
+      unionBboxes([
+        [0, 0, 1, 1],
+        [2, 2, 3, 3],
+        [-1, -1, 0, 0]
+      ])
+    ).toEqual([-1, -1, 3, 3]);
   });
 });

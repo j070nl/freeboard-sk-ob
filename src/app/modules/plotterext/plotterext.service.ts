@@ -22,12 +22,12 @@ import { Injectable, computed, effect, isDevMode, signal } from '@angular/core';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { SignalKClient } from 'signalk-client-angular';
-import { transformExtent } from 'ol/proj';
 import * as uuid from 'uuid';
 
 import { AppFacade } from 'src/app/app.facade';
 import { SKResourceService } from 'src/app/modules/skresources/resources.service';
 import { MapService } from 'src/app/modules/map/ol/lib/map.service';
+import { FIT_MAX_ZOOM, fitBbox, type LonLatBox } from 'src/app/lib/map-fit';
 import { FBCharts, FBNotes, LineString, Position } from 'src/app/types';
 import {
   type BusPort,
@@ -35,6 +35,7 @@ import {
   type MapView,
   MethodHandler,
   type NightModeState,
+  normalizeBounds,
   RoutePoint,
   RpcError,
   RPC_ERRORS,
@@ -60,12 +61,21 @@ import {
   cellHeightPx,
   parseSize
 } from './types';
+import {
+  isTemporaryRoute,
+  temporaryRouteMarker
+} from 'src/app/modules/course/temporary-route';
 import { RouteBufferRegistry } from './route-buffer.registry';
 import { createRouteMethods } from './route-methods';
 import { createChartMethods } from './chart-methods';
 import { createNightModeMethods } from './nightmode-methods';
 import { createResourceGroupMethods } from './resourcegroup-methods';
 import { SKResourceGroupService } from 'src/app/modules/skresources/components/groups/groups.service';
+import {
+  buildRoutePoints,
+  coordinatesMetaFromPoints,
+  type PointMeta
+} from 'src/app/modules/skresources/components/route-reorder.util';
 import { SKStreamFacade } from 'src/app/modules/skstream/skstream.facade';
 
 const STATE_STORAGE_KEY = 'fb-plotterext-state';
@@ -626,20 +636,16 @@ export class PlotterExtensionService {
    * (emits `route.hidden saved:true`). Drafts and dirty edits are left alone.
    */
   /** Build RoutePoints from a route's geometry + coordinatesMeta, carrying each
-   *  point's name AND description so they survive a round-trip through the
-   *  registry and back into coordinatesMeta on save. */
+   *  point's name, description AND waypoint link so they survive a round-trip
+   *  through the registry and back into coordinatesMeta on save. */
   private pointsFromRoute(
     coords: Position[],
-    meta?: Array<{ name?: string; description?: string }>
+    meta?: PointMeta[]
   ): RoutePoint[] {
-    return coords.map((position, i) => ({
-      position,
-      ...(meta?.[i]?.name ? { name: meta[i].name } : {}),
-      ...(meta?.[i]?.description ? { description: meta[i].description } : {})
-    }));
+    return buildRoutePoints(coords, meta);
   }
 
-  /** Deep-compare two point lists (position + name + description) so a
+  /** Deep-compare two point lists (position + name + description + href) so a
    *  same-length geometry/metadata edit is still detected as a change. */
   private pointsEqual(a: RoutePoint[], b: RoutePoint[]): boolean {
     if (a.length !== b.length) {
@@ -652,7 +658,8 @@ export class PlotterExtensionService {
         p.position[1] === q.position[1] &&
         (p.position[2] ?? null) === (q.position[2] ?? null) &&
         (p.name ?? null) === (q.name ?? null) &&
-        (p.description ?? null) === (q.description ?? null)
+        (p.description ?? null) === (q.description ?? null) &&
+        (p.href ?? null) === (q.href ?? null)
       );
     });
   }
@@ -663,7 +670,7 @@ export class PlotterExtensionService {
     for (const [id, route] of displayed) {
       const coords = (route.feature?.geometry?.coordinates ?? []) as Position[];
       const meta = route.feature?.properties?.coordinatesMeta as
-        Array<{ name?: string; description?: string }> | undefined;
+        PointMeta[] | undefined;
       const points = this.pointsFromRoute(coords, meta);
       // Resolve by href, not routeId: a draft saved via route.save keeps its
       // original (draft) routeId while its href points at the new resource, so
@@ -996,7 +1003,7 @@ export class PlotterExtensionService {
     const route = cached[1];
     const coords = (route.feature?.geometry?.coordinates ?? []) as Position[];
     const meta = route.feature?.properties?.coordinatesMeta as
-      Array<{ name?: string; description?: string }> | undefined;
+      PointMeta[] | undefined;
     const points = this.pointsFromRoute(coords, meta);
     const buf = this.routeRegistry.show({
       routeId: ref,
@@ -1064,11 +1071,21 @@ export class PlotterExtensionService {
    * dirty:false`) — saving does not consume the route. Resolves with
    * `{ href, rev }` on save, or null if the user cancelled. Shared by the
    * `route.save` host method and the FSK info-panel "Save" action so both behave
-   * identically. Pass `dialog:true` to prompt for the name/description.
+   * identically. Pass `dialog:true` to prompt for the name/description,
+   * `temporary:true` to store a never-saved route as a temporary route (see
+   * `course/temporary-route.ts`), and `promote:true` when the user saves a
+   * temporary route to keep it. `route.save` passes neither, so an extension
+   * saving a temporary route leaves it temporary.
    */
   async saveBuffer(
     routeId: string,
-    opts: { name?: string; description?: string; dialog?: boolean } = {}
+    opts: {
+      name?: string;
+      description?: string;
+      dialog?: boolean;
+      temporary?: boolean;
+      promote?: boolean;
+    } = {}
   ): Promise<{ href: string; rev: number } | null> {
     const buf = this.routeRegistry.get(routeId);
     if (!buf) {
@@ -1077,17 +1094,24 @@ export class PlotterExtensionService {
     const [, route] = this.skres.buildRoute(
       buf.points.map((p) => p.position) as LineString
     );
-    // buildRoute keeps only positions — carry the per-point names/descriptions
-    // and the route-level description so they are not silently dropped on save.
-    const coordinatesMeta = buf.points.map((p) => ({
-      ...(p.name ? { name: p.name } : {}),
-      ...(p.description ? { description: p.description } : {})
-    }));
-    if (coordinatesMeta.some((m) => Object.keys(m).length > 0)) {
+    // buildRoute keeps only positions — carry the per-point names, descriptions
+    // and waypoint links, and the route-level description, so they are not
+    // silently dropped on save.
+    const coordinatesMeta = coordinatesMetaFromPoints(buf.points);
+    if (coordinatesMeta) {
       route.feature.properties.coordinatesMeta = coordinatesMeta;
     }
     route.name = opts.name ?? buf.name ?? '';
     route.description = opts.description ?? buf.description ?? '';
+    if (opts.temporary && !buf.href) {
+      route.feature.properties.temporary = temporaryRouteMarker(new Date());
+    }
+    const stored = buf.href
+      ? this.skres.fromCache('routes', buf.href)?.[1]
+      : undefined;
+    if (isTemporaryRoute(stored) && !opts.promote) {
+      route.feature.properties.temporary = stored.feature.properties.temporary;
+    }
     let savedId: string | null;
     if (buf.href) {
       // Backed by an existing resource — update it in place (keep its id).
@@ -2038,10 +2062,16 @@ export class PlotterExtensionService {
    * `map.view` depends on it.
    */
   private mapView(): MapView {
+    const extent = this.app.mapExtent();
     return {
       center: this.app.config.map.center as [number, number],
       zoom: this.app.config.map.zoomLevel,
-      bounds: this.app.mapExtent() as [number, number, number, number]
+      // OpenLayers' extent runs past ±180 once the view has scrolled round
+      // the world; the API reports [west, south, east, north] in range, with
+      // west > east across the antimeridian. Only the empty extent before the
+      // map's first moveend is not a box; it passes through as before.
+      bounds:
+        normalizeBounds(extent) ?? (extent as [number, number, number, number])
     };
   }
 
@@ -2097,48 +2127,44 @@ export class PlotterExtensionService {
         return {};
       },
       'map.fitBounds': async (params) => {
-        const { bounds } = (params ?? {}) as { bounds?: number[] };
-        if (
-          !Array.isArray(bounds) ||
-          bounds.length !== 4 ||
-          !bounds.every((v) => typeof v === 'number')
-        ) {
+        // the API's form (west > east across the antimeridian) or a map
+        // engine's unwrapped one (east past 180) — both are the same box
+        const box = normalizeBounds((params as { bounds?: unknown })?.bounds);
+        if (!box) {
           throw new RpcError(
-            'map.fitBounds requires bounds [minLon, minLat, maxLon, maxLat]',
+            'map.fitBounds requires bounds [west, south, east, north]',
             { code: RPC_ERRORS.INVALID_PARAMS, reason: 'INVALID_BOUNDS' }
           );
         }
-        const [minLon, minLat, maxLon, maxLat] = bounds as number[];
-        const center: [number, number] = [
-          (minLon + maxLon) / 2,
-          (minLat + maxLat) / 2
-        ];
-        this.app.mapMoveRequest.set({
-          center,
-          zoom: this.zoomForBounds(bounds as number[])
-        });
+        this.app.mapMoveRequest.set(this.fitView(box));
         return {};
       }
     };
   }
 
   /**
-   * Compute a zoom level that frames a lon/lat bounding box in the current
-   * viewport (read-only use of the OL view). Falls back to a reasonable
-   * zoom when the map is unavailable.
+   * The centre and zoom that frame a box in the current map (read-only use of
+   * the OL map): centred on its Web Mercator middle, the short way round the
+   * antimeridian, and fitted as it lies on a rotated (heading-up) map with a
+   * margin so markers aren't at the edge. Falls back to a reasonable zoom when
+   * the map is unavailable.
    */
-  private zoomForBounds(bounds: number[]): number {
+  private fitView(box: LonLatBox): { center: Position; zoom: number } {
     const map = this.mapService.getMaps()[0];
     const size = map?.getSize();
-    if (!map || !size) return 12;
-    const view = map.getView();
-    const ext = transformExtent(bounds, 'EPSG:4326', 'EPSG:3857');
-    // pad by shrinking the usable size ~15% so markers aren't at the edge
-    const padded: [number, number] = [size[0] * 0.85, size[1] * 0.85];
-    const resolution = view.getResolutionForExtent(ext, padded);
-    const zoom = view.getZoomForResolution(resolution) ?? 12;
-    const maxZoom = this.app.MAP_ZOOM_EXTENT?.max ?? 18;
-    return Math.min(zoom, maxZoom);
+    const limits = {
+      min: this.app.MAP_ZOOM_EXTENT?.min ?? 0,
+      max: Math.min(this.app.MAP_ZOOM_EXTENT?.max ?? 18, FIT_MAX_ZOOM)
+    };
+    if (!map || !size) {
+      return { center: fitBbox(box, [1, 1], limits).center, zoom: 12 };
+    }
+    return fitBbox(
+      box,
+      [size[0], size[1]],
+      limits,
+      map.getView().getRotation()
+    );
   }
 
   /**

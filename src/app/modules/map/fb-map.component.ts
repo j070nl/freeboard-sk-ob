@@ -35,6 +35,7 @@ import {
   AlarmPopoverComponent,
   ResourcePopoverComponent,
   ResourceSetPopoverComponent,
+  RoutePointPopoverComponent,
   VesselPopoverComponent,
   S57PopoverComponent,
   S57_CLICKABLE_LAYERS,
@@ -43,14 +44,20 @@ import {
 import { FreeboardOpenlayersModule } from 'src/app/modules/map/ol';
 import { CoordsPipe } from 'src/app/lib/pipes';
 
-import { computeDestinationPoint, getGreatCircleBearing } from 'geolib';
+import { getGreatCircleBearing } from 'geolib';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { Style, Stroke, Fill } from 'ol/style';
 import { Collection, Feature } from 'ol';
 import { Feature as GeoJsonFeature } from 'geojson';
 
 import { Convert, TARGET_UNIT } from 'src/app/lib/convert';
-import { GeoUtils, Angle } from 'src/app/lib/geoutils';
+import { GeoUtils } from 'src/app/lib/geoutils';
+import {
+  computeLaylines,
+  laylineInput,
+  NO_LAYLINES
+} from 'src/app/lib/laylines';
+import { trueWindDirection } from 'src/app/lib/true-bearing';
 import { zoomKeyDirection } from 'src/app/lib/zoom-keys';
 import { isPanKey } from 'src/app/lib/pan-keys';
 import { zoomDisplayText } from 'src/app/lib/zoom-display';
@@ -111,7 +118,6 @@ import {
 import { ModifyEvent } from 'ol/interaction/Modify';
 import { DrawEvent } from 'ol/interaction/Draw';
 import { Coordinate } from 'ol/coordinate';
-import { SKPosition } from 'src/app/types';
 import {
   FBClickEvent,
   FBMapEvent,
@@ -137,11 +143,23 @@ import {
   extendRouteAtClick,
   RoutePointMeta,
   shouldExtendRoute,
+  unlinkMovedPoints,
   WORLD_WIDTH_3857
 } from './route-extend';
 import { vertexDeleted } from './ol/lib/vertex-delete';
 import { modifiedLegIndex } from './route-modify-leg';
+import {
+  ActiveRoutePoint,
+  followedPointIndex,
+  pickRoutePoints,
+  preferredRoutePoint,
+  ROUTE_POINT_PICK_PX
+} from './route-point-pick';
 import { AppIconDef } from '../icons';
+import {
+  coordinatesMetaFromPoints,
+  editsRouteBuffer
+} from '../skresources/components/route-reorder.util';
 import { LayerWindWeatherComponent } from './ol/lib/resources/layer-wind-weather.component';
 import { LayerCurrentsWeatherComponent } from './ol/lib/resources/layer-currents-weather.component';
 import { TidalCurrentsLayerComponent } from './ol/lib/resources/tidal-currents-layer.component';
@@ -220,6 +238,7 @@ const OFFSET_GRACE_PERIOD = 2000;
     AlarmPopoverComponent,
     ResourcePopoverComponent,
     ResourceSetPopoverComponent,
+    RoutePointPopoverComponent,
     VesselPopoverComponent,
     S57PopoverComponent,
     LayerWindWeatherComponent,
@@ -285,6 +304,7 @@ export class FBMapComponent implements OnInit, OnDestroy {
   });
 
   protected olMapControls = mapControls;
+  protected trueWindDirection = trueWindDirection;
   protected olMapInteractions = signal<Array<{ name: string }>>([]);
   protected mapZoomLevel = signal<number>(1);
   protected mapZoomText = computed(() => zoomDisplayText(this.mapZoomLevel()));
@@ -977,15 +997,17 @@ export class FBMapComponent implements OnInit, OnDestroy {
   /** Handle right click / touch hold */
   protected onMapRightClick(e: {
     features: FeatureLike[];
-    lonlat: Position;
+    lonlat: Coordinate;
     worldOffset?: number;
   }) {
+    // toLonLat() gives [lon, lat]
+    const lonlat = e.lonlat as Position;
     this.clickWorldOffset = e.worldOffset ?? 0;
-    this.clickMercX = fromLonLat(e.lonlat)[0] + this.clickWorldOffset;
-    this.app.data.map.atClick = e;
+    this.clickMercX = fromLonLat(lonlat)[0] + this.clickWorldOffset;
+    this.app.data.map.atClick = { features: e.features, lonlat };
     this.app.debug(`onRightClick()`, this.app.data.map.atClick);
     if (this.mapInteract.isMeasuring()) {
-      this.parseClickInMeasureMode(e.lonlat);
+      this.parseClickInMeasureMode(lonlat);
     }
   }
 
@@ -1260,12 +1282,9 @@ export class FBMapComponent implements OnInit, OnDestroy {
     ) as LineString;
     // Carry per-point metadata so editing a named draft (which seeds
     // coordsMetadata from the rendered feature's pointMetadata) doesn't drop
-    // waypoint names/descriptions on save.
-    const coordsMeta = b.points.map((p) => ({
-      ...(p.name ? { name: p.name } : {}),
-      ...(p.description ? { description: p.description } : {})
-    }));
-    if (coordsMeta.some((m) => Object.keys(m).length > 0)) {
+    // point names/descriptions or waypoint links on save.
+    const coordsMeta = coordinatesMetaFromPoints(b.points);
+    if (coordsMeta) {
       rte.feature.properties.coordinatesMeta = coordsMeta;
     }
     rte.distance = GeoUtils.routeLength(rte.feature.geometry.coordinates);
@@ -1281,6 +1300,15 @@ export class FBMapComponent implements OnInit, OnDestroy {
     return !!b && (!b.saved || b.dirty);
   }
 
+  /** True when the popover's route was drawn and never saved. */
+  protected isDraftRoute(): boolean {
+    if (this.overlay().type !== 'route') {
+      return false;
+    }
+    const b = this.routeBuffers.get(this.overlay().id);
+    return !!b && !b.saved;
+  }
+
   /**
    * Popover "Save" shortcut for an unsaved route — opens the standard Route
    * Details dialog (same path as the info-panel SAVE) and persists. Saves the
@@ -1288,7 +1316,10 @@ export class FBMapComponent implements OnInit, OnDestroy {
    */
   protected async saveRouteFromPopover() {
     try {
-      await this.plotterExt.saveBuffer(this.overlay().id, { dialog: true });
+      await this.plotterExt.saveBuffer(this.overlay().id, {
+        dialog: true,
+        promote: true
+      });
     } catch {
       // saveBuffer surfaced the server error via parseHttpErrorResponse; the
       // buffer stays dirty so the user can retry.
@@ -1534,6 +1565,75 @@ export class FBMapComponent implements OnInit, OnDestroy {
     this.app.data.editingId = this.mapInteract.draw.forSave.id;
   }
 
+  /** The active route's point `index`, counted in the order it is followed. */
+  private activeRoutePoint(index: number): ActiveRoutePoint {
+    const c = this.course.courseData();
+    // Point names are in the order the route is stored.
+    const stored = followedPointIndex(
+      index,
+      c.pointTotal,
+      this.app.data.activeRouteReversed
+    );
+    return {
+      index,
+      total: c.pointTotal,
+      name: c.pointNames?.[stored] || undefined,
+      position: c.activeRoutePoints?.[stored],
+      isNext: index === c.pointIndex
+    };
+  }
+
+  /** Whether the active route has edits not yet saved to the server, whose
+   *  point order the Course API follows. */
+  private activeRouteHasUnsavedEdits(): boolean {
+    return editsRouteBuffer(this.routeBuffers.getForRoute(this.activeRoute));
+  }
+
+  /**
+   * The point of the active route a click picked, counted in the order the
+   * route is being followed; null for a click on a leg, on another route, or
+   * on the active route while it has unsaved edits (its points on screen may
+   * not be the server's).
+   */
+  private activeRoutePointAt(
+    e: FBClickEvent,
+    feature: Feature,
+    routeId: string
+  ): number | null {
+    const geometry = feature.getGeometry();
+    if (
+      !this.activeRoute ||
+      routeId !== this.activeRoute ||
+      !(geometry instanceof OLLineString) ||
+      this.activeRouteHasUnsavedEdits()
+    ) {
+      return null;
+    }
+    const coordinates = geometry.getCoordinates();
+    const candidates = pickRoutePoints(
+      coordinates,
+      e.coordinate,
+      e.map.getView().getResolution(),
+      e.originalEvent?.pointerType === 'touch'
+        ? ROUTE_POINT_PICK_PX.touch
+        : ROUTE_POINT_PICK_PX.mouse,
+      WORLD_WIDTH_3857
+    );
+    if (!candidates.length) {
+      return null;
+    }
+    return preferredRoutePoint(
+      candidates.map((i) =>
+        followedPointIndex(
+          i,
+          coordinates.length,
+          this.app.data.activeRouteReversed
+        )
+      ),
+      this.course.courseData().pointIndex
+    );
+  }
+
   /** Process pointer click in non-interaction mode */
   private processMapClick(e) {
     this.s57Features = {};
@@ -1612,6 +1712,19 @@ export class FBMapComponent implements OnInit, OnDestroy {
             break;
           }
           case 'route': {
+            const point = this.activeRoutePointAt(e, feature, t[1]);
+            if (point !== null) {
+              id = `rtept.${point}`;
+              icon = {
+                name: 'location_on',
+                svgIcon: undefined,
+                class: 'icon-route'
+              };
+              addToFeatureList = true;
+              text =
+                this.activeRoutePoint(point).name || `Route point ${point + 1}`;
+              break;
+            }
             icon = {
               svgIcon: 'route',
               name: undefined,
@@ -1803,6 +1916,13 @@ export class FBMapComponent implements OnInit, OnDestroy {
     trackTimesHiddenByVessel(featureList.keys()).forEach((id) =>
       featureList.delete(id)
     );
+    // The destination flag marks the route point being headed for; the route
+    // point's own popover covers it and adds Skip.
+    if ([...featureList.keys()].some((id) => id.startsWith('rtept.'))) {
+      [...featureList.keys()]
+        .filter((id) => id.startsWith('dest.'))
+        .forEach((id) => featureList.delete(id));
+    }
     // server and local trail are one trail, answered from the same data
     if (
       featureList.has('trail.self.server') &&
@@ -2120,6 +2240,15 @@ export class FBMapComponent implements OnInit, OnDestroy {
           this.popoverInfo();
         }
         break;
+      case 'rtept': {
+        const index = Number(t[1]);
+        poData.id = id;
+        poData.type = 'rtept';
+        poData.routePoint = this.activeRoutePoint(index);
+        poData.title = poData.routePoint.name || 'Route point';
+        poData.show = true;
+        break;
+      }
       case 'dest':
         poData.id = id;
         poData.type = 'destination';
@@ -2133,11 +2262,11 @@ export class FBMapComponent implements OnInit, OnDestroy {
       case 'rset':
         poData.id = id;
         poData.type = t[0];
-        poData.resource = this.skresOther.fromResourceSetCache(id, true);
+        poData.resourceSet = this.skresOther.fromResourceSetCache(id, true);
         poData.title =
-          (poData.resource as GeoJsonFeature)?.properties?.name ??
+          (poData.resourceSet as GeoJsonFeature)?.properties?.name ??
           'Resource Set';
-        poData.show = poData.resource ? true : false;
+        poData.show = poData.resourceSet ? true : false;
         break;
       default:
         return;
@@ -2204,6 +2333,13 @@ export class FBMapComponent implements OnInit, OnDestroy {
     }
 
     if (mode === 'MOVE') {
+      unlinkMovedPoints(
+        startCoords,
+        endCoords,
+        meta,
+        (href) =>
+          this.skres.fromCache('waypoints', href.split('/').pop())?.[1]?.name
+      );
       return meta;
     }
     startCoords = stringifyCoords(startCoords);
@@ -2371,167 +2507,24 @@ export class FBMapComponent implements OnInit, OnDestroy {
 
   /** calculate vessel & dest laylines & update signals */
   private buildLaylines() {
-    if (
+    const input =
       this.app.config.vessels.laylines &&
-      Array.isArray(this.dfeat.navData.position) &&
-      typeof this.dfeat.navData.position[0] === 'number' &&
-      typeof this.app.data.vessels.active.heading === 'number'
-    ) {
-      const twd_deg = Convert.radiansToDegrees(
-        this.app.data.vessels.self.wind.direction ?? 0
-      );
-
-      const twd_inv = Angle.add(twd_deg, 180);
-
-      const destUpwind =
-        Math.abs(
-          Angle.difference(this.course.courseData().bearing.value, twd_deg)
-        ) < 90;
-
-      // beat angle
-      const ba_deg = Convert.radiansToDegrees(
-        this.app.data.vessels.self.performance.beatAngle ?? Math.PI / 4
-      );
-
-      // gybe angle
-      let ga_deg: number;
-      let ga_diff: number;
-      if (
-        typeof this.app.data.vessels.self.performance.gybeAngle === 'number'
-      ) {
-        ga_deg = Convert.radiansToDegrees(
-          this.app.data.vessels.self.performance.gybeAngle
-        );
-        ga_diff = 180 - Math.abs(ga_deg);
-      }
-
-      const destInTarget = destUpwind
-        ? Math.abs(
-            Angle.difference(this.course.courseData().bearing.value, twd_deg)
-          ) < ba_deg
-        : Math.abs(
-            Angle.difference(this.course.courseData().bearing.value, twd_inv)
-          ) < (ga_diff ?? 0);
-
-      const dtg =
-        this.app.config.units.distance === 'kilometer'
-          ? this.course.courseData().dtg * 1000
-          : Convert.nauticalMilesToKm(this.course.courseData().dtg * 1000);
-
-      // mark laylines
-      let markLines = [];
-      if (destUpwind) {
-        const bapt1 = computeDestinationPoint(
-          this.dfeat.navData.position,
-          dtg,
-          Angle.add(twd_inv, ba_deg)
-        );
-        const bapt2 = computeDestinationPoint(
-          this.dfeat.navData.position,
-          dtg,
-          Angle.add(twd_inv, 0 - ba_deg)
-        );
-
-        markLines = [
-          [bapt1.longitude, bapt1.latitude],
-          this.dfeat.navData.position,
-          [bapt2.longitude, bapt2.latitude]
-        ];
-      } else if (typeof ga_deg === 'number') {
-        const gapt1 = computeDestinationPoint(
-          this.dfeat.navData.position,
-          dtg,
-          Angle.add(twd_inv, ga_deg)
-        );
-        const gapt2 = computeDestinationPoint(
-          this.dfeat.navData.position,
-          dtg,
-          Angle.add(twd_inv, 0 - ga_deg)
-        );
-
-        markLines = [
-          [gapt1.longitude, gapt1.latitude],
-          this.dfeat.navData.position,
-          [gapt2.longitude, gapt2.latitude]
-        ];
-      }
-
-      this.perfTargetAngle.update(() => markLines);
-
-      // vessel laylines
-      if (destInTarget) {
-        const hbd_deg = Angle.difference(
-          twd_deg,
-          this.course.courseData().bearing.value
-        );
-        // Vector lengths
-        let b: number;
-        let c: number;
-        // intersection points
-        let ipts: SKPosition;
-        let iptp: SKPosition;
-
-        if (destUpwind) {
-          // Vector angles
-          const C_RAD = Convert.degreesToRadians(ba_deg - hbd_deg);
-          const B_RAD = Convert.degreesToRadians(ba_deg + hbd_deg);
-          const A_RAD = Math.PI - (B_RAD + C_RAD);
-          b = (dtg * Math.sin(B_RAD)) / Math.sin(A_RAD);
-          c = (dtg * Math.sin(C_RAD)) / Math.sin(A_RAD);
-          // intersection points
-          ipts = computeDestinationPoint(
+      typeof (
+        this.app.data.vessels.active.headingTrue ??
+        this.app.data.vessels.active.headingMagnetic
+      ) === 'number'
+        ? laylineInput(
             this.app.data.vessels.active.position,
-            b,
-            Angle.add(twd_deg, ba_deg)
-          );
-          iptp = computeDestinationPoint(
-            this.app.data.vessels.active.position,
-            c,
-            Angle.add(twd_deg, 0 - ba_deg)
-          );
-        } else {
-          // downwind
-          if (markLines.length !== 0 && typeof ga_diff === 'number') {
-            // Vector angles
-            const C_RAD = Convert.degreesToRadians(ga_diff - hbd_deg);
-            const B_RAD = Convert.degreesToRadians(ga_diff + hbd_deg);
-            const A_RAD = Math.PI - (B_RAD + C_RAD);
-            b = (dtg * Math.sin(B_RAD)) / Math.sin(A_RAD);
-            c = (dtg * Math.sin(C_RAD)) / Math.sin(A_RAD);
-            // intersection points
-            ipts = computeDestinationPoint(
-              this.app.data.vessels.active.position,
-              b,
-              Angle.add(twd_deg, ga_diff)
-            );
-            iptp = computeDestinationPoint(
-              this.app.data.vessels.active.position,
-              c,
-              Angle.add(twd_deg, 0 - ga_diff)
-            );
-          }
-        }
-
-        this.perfLaylines.update(() => {
-          return {
-            port: [
-              [
-                [iptp.longitude, iptp.latitude],
-                this.app.data.vessels.active.position
-              ],
-              [
-                [ipts.longitude, ipts.latitude],
-                this.app.data.vessels.active.position
-              ]
-            ],
-            starboard: [
-              [[ipts.longitude, ipts.latitude], markLines[1]],
-              [markLines[1], [iptp.longitude, iptp.latitude]]
-            ]
-          };
-        });
-      }
-    }
+            this.dfeat.navData.position,
+            this.app.data.vessels.self
+          )
+        : null;
+    const laylines = input ? computeLaylines(input) : NO_LAYLINES;
+    this.perfTargetAngle.set(laylines.targetAngle);
+    this.perfLaylines.set({
+      port: laylines.port,
+      starboard: laylines.starboard
+    });
   }
 
   // ********************
@@ -2590,6 +2583,15 @@ export class FBMapComponent implements OnInit, OnDestroy {
   // ** deactivate route / waypoint
   protected clearActiveFeature() {
     this.deactivate.emit(this.overlay().id);
+  }
+
+  // ** rejoin the active route at a point, or skip the one being headed for
+  protected rejoinRouteAt(pointIndex: number) {
+    this.course.rejoinRouteAt(pointIndex);
+  }
+
+  protected skipRoutePoint(pointIndex: number) {
+    this.course.skipRoutePoint(pointIndex);
   }
 
   // ** emit info event **

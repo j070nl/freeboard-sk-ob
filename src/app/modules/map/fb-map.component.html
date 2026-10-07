@@ -670,6 +670,7 @@
           [featureCount]="overlay().featureCount"
           [units]="scaleUnits()"
           [canSave]="isUnsavedRoute()"
+          [canStart]="isDraftRoute()"
           (modify)="modifyFeature(); popoverClosed()"
           (save)="saveRouteFromPopover(); popoverClosed()"
           (delete)="
@@ -704,7 +705,7 @@
         <resourceset-popover
           [canClose]="app.config.map.popoverMulti"
           [title]="overlay().title"
-          [resource]="overlay().resource"
+          [resource]="overlay().resourceSet"
           (modify)="modifyFeature(); popoverClosed()"
           (delete)="
             deleteFeature(overlay().id, overlay().type); popoverClosed()
@@ -750,6 +751,16 @@
           (closed)="popoverClosed()"
         >
         </aircraft-popover>
+      }
+      @if (overlay().type === 'rtept') {
+        <route-point-popover
+          [canClose]="app.config.map.popoverMulti"
+          [point]="overlay().routePoint"
+          (rejoin)="rejoinRouteAt($event); popoverClosed()"
+          (skip)="skipRoutePoint($event); popoverClosed()"
+          (closed)="popoverClosed()"
+        >
+        </route-point-popover>
       }
       @if (overlay().type === 'alarm') {
         <alarm-popover
@@ -807,7 +818,7 @@
         [line]="perfTargetAngle()"
         [lineStyle]="featureStyles.targetAngle"
         [position]="app.data.vessels.active.position"
-        [twd]="app.data.vessels.self.wind.direction"
+        [twd]="trueWindDirection(app.data.vessels.self)"
         [mapZoom]="mapZoomLevel()"
         [zIndex]="345"
       >
@@ -816,7 +827,7 @@
         [lines]="perfLaylines()"
         [laylineStyles]="featureStyles.layline"
         [position]="app.data.vessels.active.position"
-        [twd]="app.data.vessels.self.wind.direction"
+        [twd]="trueWindDirection(app.data.vessels.self)"
         [mapZoom]="mapZoomLevel()"
         [zIndex]="330"
       >
@@ -883,8 +894,9 @@
     </fb-cog-line>
   }
   @if (app.config.vessels.windVectors) {
+    <!-- twd: TRUE wind, not wind.direction (follows the true/magnetic display setting, #857) -->
     <fb-wind-lines
-      [twd]="this.dfeat.active.wind.direction"
+      [twd]="trueWindDirection(this.dfeat.active)"
       [tws]="this.dfeat.active.wind.tws"
       [awa]="this.dfeat.active.wind.awa + this.dfeat.active.orientation"
       [aws]="this.dfeat.active.wind.aws"

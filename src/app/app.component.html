@@ -986,7 +986,9 @@
                       [activated]="app.data.vessels.self.autopilot.enabled"
                       matTooltip="Autopilot"
                       matTooltipPosition="before"
-                      (click)="toggleAutopilotConsole(true)"
+                      (click)="
+                        toggleAutopilotConsole(!app.uiCtrl().autopilotConsole)
+                      "
                     >
                       <mat-icon
                         class="ob"
@@ -1010,7 +1012,7 @@
                       [disabled]="this.app.instrumentPanel().open"
                       matTooltip="Radar"
                       matTooltipPosition="before"
-                      (click)="showRadarPanel()"
+                      (click)="toggleRadarPanel()"
                     >
                       <mat-icon class="ob" svgIcon="radar-iec"></mat-icon>
                     </obc-icon-button>
@@ -1301,7 +1303,7 @@
           @if (!isInteracting() && !app.kioskMode()) {
             <mfb-container
               [action]="app.config.display.fab"
-              (radarClick)="showRadarPanel()"
+              (radarClick)="toggleRadarPanel()"
             >
             </mfb-container>
           }

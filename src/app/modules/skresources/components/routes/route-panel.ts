@@ -10,6 +10,8 @@ import {
   signal
 } from '@angular/core';
 import { RouteBufferRegistry } from 'src/app/modules/plotterext/route-buffer.registry';
+import { TemporaryRouteService } from 'src/app/modules/course/temporary-route.service';
+import { isTemporaryRoute } from 'src/app/modules/course/temporary-route';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,7 +27,7 @@ import { markdownProcessor } from '../../../../lib/markdown';
 import { AppFacade } from 'src/app/app.facade';
 import { InfoPanelFacade } from 'src/app/modules/info-panel/info-panel.facade';
 import { AppIconDef, getResourceIcon } from 'src/app/modules/icons';
-import { SKRoute } from '../../resource-classes';
+import { SKRoute, SKWaypoint } from '../../resource-classes';
 import { SKResourceService } from '../../resources.service';
 import { FBNotes, Position } from 'src/app/types';
 import {
@@ -37,6 +39,8 @@ import { CourseService } from 'src/app/modules/course';
 import { GeoUtils } from 'src/app/lib/geoutils';
 import { MatStepperModule } from '@angular/material/stepper';
 import { ActiveResourcePropertiesModal } from '../active-resource-dialog';
+import { editsRouteBuffer } from '../route-reorder.util';
+import { routePointsMeta } from '../route-points-meta.util';
 import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -81,6 +85,26 @@ export class RoutePanel {
     const b = this.routeBuffers.live().find((x) => x.routeId === this.id());
     return !!b && (!b.saved || b.dirty);
   });
+  /** True for a drawn route that was never saved: START follows it as a
+   *  temporary route. */
+  protected isDraft = computed(() => {
+    const b = this.routeBuffers.live().find((x) => x.routeId === this.id());
+    return !!b && !b.saved;
+  });
+  protected isTemporary = computed(() => isTemporaryRoute(this._route()));
+  /** Whether this is the route being followed. Read from course data so it
+   *  updates when the course changes. */
+  /** Whether this route has edits not yet saved to the server, whose point
+   *  order the Course API follows. */
+  protected hasUnsavedEdits = computed(() => {
+    // live() makes this re-evaluate when a buffer changes.
+    this.routeBuffers.live();
+    return editsRouteBuffer(this.routeBuffers.getForRoute(this.id()));
+  });
+  protected isActive = computed(() => {
+    this.course.courseData();
+    return !!this.id() && this.app.data.activeRoute === this.id();
+  });
   protected notes = signal<FBNotes>([]);
   protected groups = signal<FBResourceGroups>([]);
   protected points = signal<
@@ -100,7 +124,8 @@ export class RoutePanel {
   private skres = inject(SKResourceService);
   private routeBuffers = inject(RouteBufferRegistry);
   private infoPanel = inject(InfoPanelFacade);
-  private course = inject(CourseService);
+  protected course = inject(CourseService);
+  private temporaryRoutes = inject(TemporaryRouteService);
   protected skgroups = inject(SKResourceGroupService);
   private dialog = inject(MatDialog);
   private bottomSheet = inject(MatBottomSheet);
@@ -121,9 +146,12 @@ export class RoutePanel {
     });
 
     effect(() => {
+      // Runs on every course change: the reversed flag is not a signal, and
+      // isActive() only notifies when its own value changes.
       this.course.courseData();
-      if (this.routeReversed !== this.app.data.activeRouteReversed) {
-        this.routeReversed = this.app.data.activeRouteReversed;
+      const reversed = this.listReversed();
+      if (this.routeReversed !== reversed) {
+        this.routeReversed = reversed;
         this.parsePoints();
       }
     });
@@ -160,12 +188,18 @@ export class RoutePanel {
         for (let i = 0; i < legs.length; ++i) {
           r.push(Object.assign({}, legs[i], meta[i]));
         }
-        if (this.app.data.activeRouteReversed) {
+        if (this.listReversed()) {
           r = r.reverse();
         }
         return r;
       });
     }
+  }
+
+  /** Whether the points are listed in reverse: only while this is the active
+   *  route and it is followed in reverse. */
+  private listReversed(): boolean {
+    return this.isActive() && this.app.data.activeRouteReversed;
   }
 
   /** Get bearing and distance for each route leg */
@@ -184,53 +218,11 @@ export class RoutePanel {
 
   /** get route point metatdata */
   private getPointsMeta() {
-    if (
-      this._route().feature.properties.coordinatesMeta &&
-      Array.isArray(this._route().feature.properties.coordinatesMeta)
-    ) {
-      const pointsMeta = this._route().feature.properties.coordinatesMeta.map(
-        (p) => {
-          return {
-            name: p?.name ?? '',
-            description: p?.description ?? ''
-          };
-        }
-      );
-      let idx = 0;
-      return pointsMeta.map((pt) => {
-        idx++;
-        if (pt.href) {
-          const id = pt.href.split('/').slice(-1);
-          const wpt = this.skres.fromCache('waypoints', id[0]);
-          return wpt
-            ? {
-                index: idx,
-                name: `* ${wpt[1].name}`,
-                description: `* ${wpt[1].description}`
-              }
-            : {
-                index: idx,
-                name: '!wpt reference!',
-                description: ''
-              };
-        } else {
-          return {
-            index: idx,
-            name: pt.name ?? `RtePt-${('000' + String(idx)).slice(-3)}`,
-            description: pt.description ?? ``
-          };
-        }
-      });
-    } else {
-      let idx = 0;
-      return this._route().feature.geometry.coordinates.map(() => {
-        return {
-          index: idx,
-          name: `RtePt-${('000' + String(++idx)).slice(-3)}`,
-          description: ''
-        };
-      });
-    }
+    return routePointsMeta(
+      this._route().feature.geometry.coordinates.length,
+      this._route().feature.properties.coordinatesMeta,
+      (id) => this.skres.fromCache('waypoints', id)?.[1] as SKWaypoint
+    ).map((meta, index) => ({ index, ...meta }));
   }
 
   protected onEdit() {
@@ -251,9 +243,21 @@ export class RoutePanel {
     }
     if (typeof index === 'undefined') {
       this.activate.emit(this.id());
+    } else if (this.isDraft()) {
+      this.temporaryRoutes.start(this.id(), index);
     } else {
       this.course.activateRoute(this.id(), index);
     }
+  }
+
+  /** Rejoin the route at point `index` (in the order it is followed): head
+   *  straight there, then follow the route on. */
+  protected onRejoin(index: number) {
+    this.course.rejoinRouteAt(index);
+  }
+
+  protected onSkip(index: number) {
+    this.course.skipRoutePoint(index);
   }
 
   protected async onDelete() {

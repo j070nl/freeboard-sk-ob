@@ -22,9 +22,10 @@ yet.
 chart — freshly drawn or previously saved — to bring up its actions:
 **Modify** to reshape it, **Points** to reorder its point list, **Hide**
 to take it off the chart, **Delete** to remove it, and more. An unsaved
-route also offers **Save** right there, so turning a quick sketch into a
-permanent route is one tap. Saving keeps the route right where it is on the
-chart — it won't disappear on you.
+route also offers **Save** and **Start** right there: Save turns a quick
+sketch into a permanent route in one tap, and Start begins following it
+straight away, without saving — see *Following a Route*. Saving keeps the
+route right where it is on the chart — it won't disappear on you.
 
 ![Fig 2. The editing card while modifying a route — running distance, the active leg, and Undo / Save / Cancel in one place](route-planning-2.jpg)
 
@@ -37,7 +38,7 @@ of deleting it. To **extend the route**, click open water past its end: the
 route grows by a new end point, the same way you drew it, without leaving
 Modify.
 **Undo** steps back through your edits one at a time. The card's commit
-action saves your changes — labelled **Save** for a route that isn't stored
+action saves your changes — labeled **Save** for a route that isn't stored
 yet, **Finish** for one that is — and **Cancel** (or the ✕) discards them,
 with no separate "save changes?" prompt to answer.
 
@@ -54,7 +55,7 @@ active can't be hidden.)
 
 The route's info panel offers the same actions — **Save**, **Edit**,
 **Delete** — plus the point list, distance, and a description you can write
-for the route. A route that hasn't been saved yet is labelled **(unsaved)**
+for the route. A route that hasn't been saved yet is labeled **(unsaved)**
 so you always know its status at a glance.
 
 If you have an extension plugin installed that helps you plan routes — an

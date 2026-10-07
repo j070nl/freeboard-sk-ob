@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { beforeEach, describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { of, throwError } from 'rxjs';
 
 import { CourseService } from './course.service';
 import { SignalKClient } from 'signalk-client-angular';
@@ -188,5 +189,233 @@ describe('CourseService course API data (#755)', () => {
     expect(c.eta).toBeInstanceOf(Date);
     expect(c.eta.toISOString()).toBe('2026-09-18T12:00:00.000Z');
     expect(c.route.eta).toBeNull();
+  });
+});
+
+/**
+ * The destination flag and its popover are labelled with the name of the point
+ * the route is heading for. Point names are in the order the route is stored,
+ * while the Course API's `pointIndex` counts in the order it is followed (#871).
+ */
+describe('CourseService destination point name', () => {
+  const names = ['Alpha', 'Bravo', 'Charlie', 'Delta'];
+  const route = [
+    'rte-1',
+    {
+      name: 'Reverse test',
+      feature: {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [24.95, 60.15],
+            [24.955, 60.16],
+            [24.95, 60.17],
+            [24.955, 60.18]
+          ]
+        },
+        properties: { coordinatesMeta: names.map((name) => ({ name })) }
+      }
+    }
+  ];
+  const point = (lon: number, lat: number) => ({
+    type: 'RoutePoint' as CoursePointType,
+    position: { longitude: lon, latitude: lat }
+  });
+
+  const destinationName = (pointIndex: number, reverse: boolean) => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        CourseService,
+        { provide: SignalKClient, useValue: {} },
+        {
+          provide: AppFacade,
+          useValue: {
+            config: { units: { distance: 'naut-mile' } },
+            useMagnetic: false,
+            data: {
+              activeWaypoint: null,
+              activeRoute: null,
+              activeRouteReversed: false
+            }
+          }
+        },
+        {
+          provide: SKResourceService,
+          useValue: {
+            routes: signal(null),
+            fromCache: () => route,
+            routeAddFromServer: () => undefined
+          }
+        }
+      ]
+    });
+    const service = TestBed.inject(CourseService);
+    service.parseSelf({
+      courseApi: {
+        arrivalCircle: 100,
+        activeRoute: {
+          href: '/resources/routes/rte-1',
+          pointIndex,
+          pointTotal: names.length,
+          reverse,
+          name: 'Reverse test'
+        },
+        nextPoint: point(24.95, 60.17),
+        previousPoint: point(24.955, 60.18)
+      },
+      courseCalcs: {}
+    } as unknown as SKVessel);
+    return service.courseData().destPointName;
+  };
+
+  it('names the point being headed for on a route followed in reverse', () => {
+    expect(destinationName(0, true)).toBe('Delta');
+    expect(destinationName(1, true)).toBe('Charlie');
+    expect(destinationName(3, true)).toBe('Alpha');
+  });
+
+  it('names the point being headed for on a route followed forwards', () => {
+    expect(destinationName(0, false)).toBe('Alpha');
+    expect(destinationName(1, false)).toBe('Bravo');
+    expect(destinationName(3, false)).toBe('Delta');
+  });
+});
+
+/**
+ * Rejoin the route at a point: the Course API measures cross-track error along
+ * the route's leg into the new point, so the course is restarted from the
+ * vessel afterwards to head straight for it.
+ */
+describe('CourseService rejoin the route at a point', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const setup = (failPointIndex = false) => {
+    const puts: Array<{ path: string; body: unknown }> = [];
+    const putWithContext = vi.fn(
+      (_version: number, _context: string, path: string, body: unknown) => {
+        puts.push({ path, body });
+        return failPointIndex && path.endsWith('pointIndex')
+          ? throwError(() => ({ status: 400 }))
+          : of({});
+      }
+    );
+    const parseHttpErrorResponse = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        CourseService,
+        { provide: SignalKClient, useValue: { api: { putWithContext } } },
+        {
+          provide: AppFacade,
+          useValue: { skApiVersion: 2, parseHttpErrorResponse }
+        },
+        { provide: SKResourceService, useValue: { routes: signal(null) } }
+      ]
+    });
+    return {
+      service: TestBed.inject(CourseService),
+      puts,
+      parseHttpErrorResponse
+    };
+  };
+
+  it('sets the point, then restarts the course from the vessel', async () => {
+    const { service, puts } = setup();
+
+    expect(await service.rejoinRouteAt(3)).toBe(true);
+
+    expect(puts).toEqual([
+      {
+        path: 'navigation/course/activeRoute/pointIndex',
+        body: { value: 3 }
+      },
+      { path: 'navigation/course/restart', body: null }
+    ]);
+  });
+
+  it('does not restart when the point is refused', async () => {
+    const { service, puts, parseHttpErrorResponse } = setup(true);
+
+    expect(await service.rejoinRouteAt(3)).toBe(false);
+
+    expect(puts.map((p) => p.path)).toEqual([
+      'navigation/course/activeRoute/pointIndex'
+    ]);
+    expect(parseHttpErrorResponse).toHaveBeenCalled();
+  });
+
+  it('skips to the point after the one shown', async () => {
+    const { service, puts } = setup();
+
+    await service.skipRoutePoint(1);
+
+    expect(puts[0]).toEqual({
+      path: 'navigation/course/activeRoute/pointIndex',
+      body: { value: 2 }
+    });
+  });
+
+  it('only re-targets when the course moved on before the skip landed', async () => {
+    const { service, puts } = setup();
+    // SKIP shown on point 1, but the vessel arrived and the course advanced
+    (
+      service as unknown as {
+        _courseData: { update: (fn: (c: object) => object) => void };
+      }
+    )._courseData.update((c) => ({ ...c, pointIndex: 2 }));
+
+    await service.skipRoutePoint(1);
+
+    // point 2 again, not point 3: the new target is not skipped too
+    expect(puts[0].body).toEqual({ value: 2 });
+  });
+});
+
+describe('CourseService arrival circle', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  const setup = (fail = false) => {
+    const putWithContext = vi.fn(() =>
+      fail ? throwError(() => ({ status: 403 })) : of({})
+    );
+    const parseHttpErrorResponse = vi.fn();
+    TestBed.configureTestingModule({
+      providers: [
+        CourseService,
+        { provide: SignalKClient, useValue: { api: { putWithContext } } },
+        {
+          provide: AppFacade,
+          useValue: { skApiVersion: 2, parseHttpErrorResponse }
+        },
+        { provide: SKResourceService, useValue: { routes: signal(null) } }
+      ]
+    });
+    return {
+      service: TestBed.inject(CourseService),
+      putWithContext,
+      parseHttpErrorResponse
+    };
+  };
+
+  it('sets the arrival circle of the course being followed', async () => {
+    const { service, putWithContext } = setup();
+
+    expect(await service.setArrivalCircle(50)).toBe(true);
+
+    expect(putWithContext).toHaveBeenCalledWith(
+      2,
+      'self',
+      'navigation/course/arrivalCircle',
+      { value: 50 }
+    );
+  });
+
+  it('reports a refusal', async () => {
+    const { service, parseHttpErrorResponse } = setup(true);
+
+    expect(await service.setArrivalCircle(50)).toBe(false);
+
+    expect(parseHttpErrorResponse).toHaveBeenCalled();
   });
 });

@@ -95,6 +95,10 @@ import {
 import { Convert } from 'src/app/lib/convert';
 import { GeoUtils } from 'src/app/lib/geoutils';
 import { isUndoKeyEvent } from 'src/app/lib/undo-keys';
+import {
+  buildRoutePoints,
+  type PointMeta
+} from 'src/app/modules/skresources/components/route-reorder.util';
 
 import * as semver from 'semver';
 
@@ -118,6 +122,7 @@ import { RadarAPIService } from './modules/radar/radar-api.service';
 import { PlotterExtensionService } from './modules/plotterext/plotterext.service';
 import { WhatsNewService } from './modules/features/whats-new.service';
 import { RouteBufferRegistry } from './modules/plotterext/route-buffer.registry';
+import { TemporaryRouteService } from './modules/course/temporary-route.service';
 import { PlotterExtensionOverlay } from './modules/plotterext/widget-overlay.component';
 import { PlotterBackgroundHost } from './modules/plotterext/background-runtime.component';
 import { PlotterPanelDrawer } from './modules/plotterext/panel-drawer.component';
@@ -295,6 +300,7 @@ export class AppComponent {
   private symbols = inject(SymbolService);
   protected routeBuffers = inject(RouteBufferRegistry);
   protected plotterExt = inject(PlotterExtensionService);
+  private temporaryRoutes = inject(TemporaryRouteService);
   protected whatsNew = inject(WhatsNewService);
 
   constructor() {
@@ -493,6 +499,17 @@ export class AppComponent {
     this.connectRadar();
     this.infoPanel.openRadar(this.radarApi.radar());
     this.focusMap();
+  }
+
+  /** Open the radar panel, or close it when it is already showing. Closing it
+   *  leaves the radar overlay on; the overlay is switched off in the panel. */
+  protected toggleRadarPanel() {
+    if (this.infoPanel.item()?.type === 'radars') {
+      this.infoPanel.close();
+      this.closeDrawer();
+    } else {
+      this.showRadarPanel();
+    }
   }
 
   protected connectRadar() {
@@ -991,6 +1008,23 @@ export class AppComponent {
       this.stream.requestTrailFromServer();
     }
     this.showTrackApiNotice(source);
+  }
+
+  /** Back in view after the page was hidden. Meanwhile the browser held back
+   * the timer that extends the local trail, or froze the page, so the trail
+   * would run straight from where it stopped to the vessel. The server trail
+   * has the points in between: fetch it again. Not in history playback,
+   * whose trail is drawn from the positions played back. */
+  @HostListener('document:visibilitychange')
+  protected onVisibilityChange() {
+    if (
+      document.visibilityState === 'visible' &&
+      this.mode === SKSTREAM_MODE.REALTIME &&
+      this.app.config.vessels.trail &&
+      this.app.serverTrailWanted()
+    ) {
+      this.stream.requestTrailFromServer();
+    }
   }
 
   /** While tracks come from the v1 fallback, say once per session that the
@@ -1589,10 +1623,35 @@ export class AppComponent {
   // ********** MAP / UI ACTIONS **********
 
   // ** set active route starting at nearest point **
-  protected activateRoute(id: string) {
-    const r = this.skres.fromCache('routes', id);
+  // A drawn route that was never saved is followed as a temporary route.
+  protected async activateRoute(id: string) {
+    // A stored draft keeps its draft id (e.g. in a popover opened before it
+    // was stored); navigate the stored route it now points at.
+    const buffer = this.routeBuffers.get(id);
+    if (buffer?.saved && buffer.href) {
+      id = buffer.href;
+    }
+    const isDraft = this.temporaryRoutes.isDraft(id);
+    let coordinates = isDraft
+      ? (this.routeBuffers.get(id).points.map((p) => p.position) as LineString)
+      : this.skres.fromCache('routes', id)?.[1].feature.geometry.coordinates;
+    if (!coordinates) {
+      // Only routes displayed on the map are cached; the Routes list can open
+      // the info panel of any route.
+      try {
+        coordinates = (await this.skres.fromServer('routes', id)).feature
+          .geometry.coordinates;
+      } catch (err) {
+        this.app.parseHttpErrorResponse(err);
+        return;
+      }
+    }
+    const start = (pointIndex?: number) =>
+      isDraft
+        ? this.temporaryRoutes.start(id, pointIndex)
+        : this.course.activateRoute(id, pointIndex);
     const cpi = GeoUtils.closestForwardPoint(
-      r[1].feature.geometry.coordinates,
+      coordinates,
       this.app.data.vessels.self.position,
       Convert.radiansToDegrees(this.app.data.vessels.self.heading)
     );
@@ -1604,17 +1663,18 @@ export class AppComponent {
         )
         .subscribe((r) => {
           if (r) {
-            this.course.activateRoute(id);
+            start();
           }
         });
       return;
     }
-    this.course.activateRoute(id, cpi);
+    start(cpi);
   }
 
   // ** Increment / decrement next active route point **
+  // Stepping is a manual skip, so like Skip it heads straight from the vessel.
   protected routeNextPoint(pointIndex: number) {
-    this.course.coursePointIndex(pointIndex);
+    this.course.rejoinRouteAt(pointIndex);
     this.focusMap();
   }
 
@@ -1913,7 +1973,8 @@ export class AppComponent {
     // dialog: true — the FSK SAVE button always prompts for a name.
     try {
       const result = await this.plotterExt.saveBuffer(bufferId, {
-        dialog: true
+        dialog: true,
+        promote: true
       });
       if (result) {
         this.infoPanel.open('routes', result.href);
@@ -2065,19 +2126,13 @@ export class AppComponent {
         if (buf && !buf.saved) {
           // Unsaved draft: stage the modified geometry to the buffer (emits
           // route.dirty). Persisted only via an explicit Save. Carry the
-          // per-point name/description so metadata is not dropped on a later
-          // Save.
+          // per-point name/description/waypoint link so metadata is not
+          // dropped on a later Save.
           const meta = this.mapInteract.draw.forSave.coordsMetadata as
-            Array<{ name?: string; description?: string }> | undefined;
+            PointMeta[] | undefined;
           this.routeBuffers.replace(
             r[1],
-            (coords as Position[]).map((position, i) => ({
-              position,
-              ...(meta?.[i]?.name ? { name: meta[i].name } : {}),
-              ...(meta?.[i]?.description
-                ? { description: meta[i].description }
-                : {})
-            }))
+            buildRoutePoints(coords as Position[], meta)
           );
         } else {
           // Saved route (plain resource or a saved buffer): persist the edit,
@@ -2217,6 +2272,7 @@ export class AppComponent {
     this.queryAfterConnect();
     // ** start trail timer
     this.startTimers();
+    this.temporaryRoutes.sweep();
   }
 
   // ** handle connection closure

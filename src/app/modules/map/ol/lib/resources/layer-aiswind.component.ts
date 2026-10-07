@@ -13,6 +13,7 @@ import { MapComponent, zoomOffsetLevel } from '../map.component';
 import { AISBaseLayerComponent } from './ais-base.component';
 import { GeoUtils } from 'src/app/lib/geoutils';
 import { SKVessel } from 'src/app/modules/skresources';
+import { trueWindDirection } from 'src/app/lib/true-bearing';
 
 // ** Signal K AIS Vessel Wind vector  **
 @Component({
@@ -38,12 +39,15 @@ export class AISWindLayerComponent extends AISBaseLayerComponent {
     }
   }
 
+  // The chart is laid out to true north, so draw from the TRUE wind direction:
+  // `wind.direction` follows the true/magnetic display setting and would rotate
+  // the vector by the local variation (#857, #858).
   calcVector(target: SKVessel) {
     const windDirection = this.vectorApparent
       ? typeof target.wind.awa !== 'undefined'
         ? target.orientation + target.wind.awa
         : null
-      : target.wind.direction;
+      : trueWindDirection(target);
 
     if (typeof windDirection !== 'number') {
       return [];
@@ -104,10 +108,17 @@ export class AISWindLayerComponent extends AISBaseLayerComponent {
               const target = this.targets.get(id) as SKVessel;
               const position = this.targets.get(id).position;
               const v = this.calcVector(target);
-              if (position && v.length === 2) {
-                f.setGeometry(new LineString(v));
+              if (v.length !== 2) {
+                // no direction for this vector type any more (e.g. apparent
+                // toggled to true on a target without true wind): drop it
+                // rather than leave the old line drawn in the new style
+                this.source.removeFeature(f);
+              } else {
+                if (position) {
+                  f.setGeometry(new LineString(v));
+                }
+                f.setStyle(this.buildVectorStyle());
               }
-              f.setStyle(this.buildVectorStyle());
             } else {
               this.addWindVectorWithId(id);
             }

@@ -1,3 +1,6 @@
+// Enter the circular map/app graph through its production root before the leaf.
+// Keep test module isolation enabled; otherwise load order masks this cycle.
+import 'src/app/app.component';
 import { describe, expect, it } from 'vitest';
 import { ChangeDetectorRef } from '@angular/core';
 import VectorSource from 'ol/source/Vector';

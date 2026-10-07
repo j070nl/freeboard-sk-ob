@@ -467,7 +467,7 @@ not match and the handshake is refused — a deliberate limitation, not a bug.)
 | `resourceGroup.apply`   | `{ id }`                                       | `{ applied }`              |
 | `map.getView`           | —                                              | `{ center, zoom, bounds }` |
 | `map.center`            | `{ position: [lon, lat], zoom? }`              | `{}`                       |
-| `map.fitBounds`         | `{ bounds: [minLon, minLat, maxLon, maxLat] }` | `{}`                       |
+| `map.fitBounds`         | `{ bounds: [west, south, east, north] }`       | `{}`                       |
 | `nightMode.get`         | —                                              | `{ enabled, auto }`        |
 | `nightMode.set`         | `{ enabled?, auto? }`                           | `{}`                       |
 | `ui.openPanel`          | `{ panel }`                                    | `{}`                       |
@@ -679,11 +679,38 @@ follower the outcome (`true` = still on the server, `false` = gone), while the
 *verb the extension called* carries the intent.
 
 **Points and geometry.** A route's points are an ordered list (0-based). A point
-is `{ position: [lon, lat, alt?], name?, description? }` — `name`/`description`
-map to a host's per-point metadata and round-trip through `route.get`,
-`route.replace`, and `route.save`. `route.create` and `route.replace` require at
-least two points and reject a malformed point (a non-numeric `position`, or
-non-string `name`/`description`) with `routes.badRequest`.
+is `{ position: [lon, lat, alt?], name?, description?, href? }` —
+`name`/`description`/`href` map to a host's per-point metadata and round-trip
+through `route.get`, `route.replace`, and `route.save`. `route.create` and
+`route.replace` require at least two points and reject a malformed point (a
+non-numeric `position`, a non-string `name`/`description`, or an `href` that is
+not a waypoint reference) with `routes.badRequest`.
+
+**Waypoint links.** `href` links a point to a saved waypoint, as a Signal K
+resource path: `/resources/waypoints/<id>`. This is the same reference a Signal K
+route stores in its per-point metadata, so a point that is linked on the server
+arrives linked in `route.get`, and `route.save` stores the link again.
+
+- **A link is a reference, not a copy.** `position` alone defines the route's
+  geometry, and a point's own `name`/`description` stay its own. A linked point
+  may also carry a `name`; one that doesn't may be labelled with the waypoint's
+  name wherever it is shown.
+- **The host does not keep the point and its waypoint in step.** A client that
+  moves a linked point off its waypoint should drop the `href` (or link the
+  point to a different waypoint). Moving the waypoint itself later does not move
+  the route point.
+- **A link can outlive its waypoint.** A host need not check that the waypoint
+  exists when it accepts or saves an `href`. Treat a link that no longer
+  resolves as no link.
+- Adding, changing or removing only a point's `href` is still a content change:
+  it emits `route.dirty` and bumps `rev` like any other edit.
+
+**Older hosts.** `href` was added after the `routes` capability. A host built
+against the earlier contract never reports it and drops it when it copies points,
+so a link set through `route.create` or `route.replace` is lost and the point is
+saved unlinked. Nothing on the wire tells the two hosts apart. An extension that
+depends on links can call `route.get` after its write and check that the `href`
+is still there.
 
 **Revisions and mirroring.** Each route carries a monotonic `rev` that
 increments on every mutation. `route.get` and `route.list` report the current
@@ -758,14 +785,14 @@ topmost first** (index 0 is drawn on top). Each entry is:
   "visible": true,
   "opacity": 1.0,            // 0..1
   "type": "raster",          // best-effort: raster | vector | S-57 | WMS | …
-  "bounds": [-80.5, 25.5, -80.0, 26.0],  // [minLon,minLat,maxLon,maxLat], optional
+  "bounds": [-80.5, 25.5, -80.0, 26.0],  // [west,south,east,north], optional
   "minZoom": 4, "maxZoom": 18            // optional
 }
 ```
 
 `id`, `name`, `visible` and `opacity` are always present; `type`, `bounds`,
 `minZoom` and `maxZoom` are best-effort and omitted when the host does not know
-them. Because the array is ordered, `chart.list` also *is* the way to read the
+them. `bounds` follows the convention in *Bounding boxes* (under *Map view*). Because the array is ordered, `chart.list` also *is* the way to read the
 current stacking order — there is no separate `getOrder`.
 
 **Mutating — all batch.** Every mutator takes a set, so an extension turns
@@ -1000,13 +1027,15 @@ shape:
 {
   "center": [-80.19, 25.77],              // [lon, lat] of the viewport centre
   "zoom": 13.4,                           // may be fractional
-  "bounds": [-80.5, 25.5, -80.0, 26.0]    // [minLon,minLat,maxLon,maxLat]
+  "bounds": [-80.5, 25.5, -80.0, 26.0]    // [west,south,east,north]
 }
 ```
 
 `bounds` is the axis-aligned lon/lat box covering what is currently rendered — on
 a host whose map can be rotated, the box that contains the rotated view, not the
-view itself. Treat it as "at least this much is on screen".
+view itself. Treat it as "at least this much is on screen". `center` and `bounds`
+are both in the range described under *Bounding boxes*, so the centre always lies
+inside the box.
 
 **`map.view`** (see *Host events*) is emitted when the viewport has **settled** —
 once the pan or zoom gesture and any kinetic glide have come to rest, which is
@@ -1036,6 +1065,51 @@ built against the earlier contract advertises `map`, answers `map.getView`, and
 never emits. An extension that must work on such a host should fall back to
 polling `map.getView` if no `map.view` arrives — but keep the interval slow, since
 polling for a change is exactly what this event exists to avoid.
+
+#### Bounding boxes
+
+Every lon/lat box in this API — `bounds` in `map.getView` and `map.view`, the
+`bounds` passed to `map.fitBounds`, and a chart's `bounds` in `chart.list` — is
+`[west, south, east, north]` in decimal degrees: the GeoJSON bounding-box order
+([RFC 7946 §5](https://www.rfc-editor.org/rfc/rfc7946#section-5)), and the same
+convention as the Signal K Track API's `bbox`.
+
+- **Longitudes are always in `[-180, 180]`.** A host normalises what it reports,
+  even when the user has panned the chart into another copy of the world — map
+  engines let the view scroll round the globe indefinitely, and their own
+  extents then run past ±180. A longitude outside the range is never sent.
+- **A box that crosses the antimeridian has `west` greater than `east`**
+  ([RFC 7946 §5.2](https://www.rfc-editor.org/rfc/rfc7946#section-5.2)).
+  `[175, -21, -175, -13]` is a box ten degrees wide around 180° (Fiji), **not** a
+  band 350 degrees wide round the rest of the world. Nothing else signals the
+  crossing, so an extension comparing `west` and `east` must not assume
+  `west <= east`.
+- **A view showing every longitude** (a very low zoom) is reported as `west` -180
+  and `east` 180.
+- **`map.fitBounds` accepts the same convention, and also the unwrapped form**
+  map engines use internally — `east` past 180 (or `west` past -180) with
+  `west < east`, such as `[175, -21, 185, -13]` — and treats it as the same box.
+  So an extension can pass a box straight from a Signal K API or straight from
+  its own map library. It fits the box the short way round: the box above is
+  centred near 180°, never on Greenwich. A box with `south` greater than `north`,
+  or a latitude outside `[-90, 90]`, is rejected with `INVALID_BOUNDS`.
+
+Arithmetic on a box has to allow for the crossing. Its width in degrees of
+longitude, and whether it holds a longitude, are:
+
+```js
+const lonSpan = ([w, , e]) => (e >= w ? e - w : e - w + 360)
+const holdsLon = ([w, , e], lon) => (w <= e ? lon >= w && lon <= e : lon >= w || lon <= e)
+```
+
+**Hosts built before this convention** may report longitudes past
+±180 from `map.getView` / `map.view`, and may centre a `map.fitBounds` box that
+crosses the antimeridian in the wrong place. An extension that must support them
+can normalise what it receives by wrapping each longitude outside `[-180, 180]`
+into range (`((lon % 360) + 540) % 360 - 180`, which holds for any finite
+longitude), treating a box 360 or more degrees wide as `[-180, south, 180,
+north]`; and can pass `map.fitBounds` a crossing box in the unwrapped form,
+which the reference host has always fitted correctly.
 
 ### State storage
 

@@ -116,7 +116,10 @@ persist — distinct from the user-cancel `routes.saveCancelled`),
   Edit / Delete** consistently (drafts get a quick Delete/discard; server-backed
   actions like Start / Route Points / Show Notes are hidden for unsaved drafts).
 - Saving keeps the route on the map (it isn't consumed), and per-point
-  names/descriptions plus the route description round-trip through save.
+  names/descriptions, waypoint links (`href`) and the route description
+  round-trip through save. Every saved point carries a `name` (`''` when
+  unnamed), and moving a linked point off its waypoint in the native editor
+  drops its link.
 - Freeboard mirrors its own displayed/edited routes into the visible set, so
   extensions observe native edits as `route.*` events too.
 
@@ -352,6 +355,23 @@ reaching into the OpenLayers view directly — driving the OL view bypasses the
 `mapCenter`/`mapZoom` signal flow, so chart and resource layers would not refresh
 after the move.
 
+Boxes follow the spec's *Bounding boxes* convention — `[west, south, east,
+north]`, longitudes in `[-180, 180]`, `west > east` across the antimeridian. Two
+places enforce it, because OpenLayers pans round the world without limit and its
+extents run past ±180:
+
+- **Reporting** — `mapView()` passes `app.mapExtent()` (the OL extent transformed
+  to EPSG:4326) through the bus's `normalizeBounds`, which wraps each longitude
+  into range. `chart.list` normalises each chart's stored `bounds` the same way,
+  omitting one that is not a box.
+- **Fitting** — `map.fitBounds` accepts either form via `normalizeBounds`
+  (rejecting a non-box with `INVALID_BOUNDS`) and computes the move with
+  `fitBbox` (`src/app/lib/map-fit.ts`, shared with the Track history window's
+  zoom-to-track): the box's Web Mercator middle, the short way round the
+  antimeridian, fitted as it lies on a rotated (heading-up) map, and zoomed no
+  deeper than `FIT_MAX_ZOOM` (16) so a single-point box doesn't land far past any
+  chart's detail.
+
 ### Events (`map.view`)
 
 `map.view` (`{ center, zoom, bounds }`) is emitted for **every** settled viewport
@@ -371,6 +391,7 @@ comparison must be by value.
 |------|------|
 | `src/app/modules/plotterext/plotterext.service.ts` | the `map.*` handlers, `mapView()`, and `map.view` emission (`emitMapViewChange`) |
 | `src/app/modules/map/fb-map.component.ts` | `onMapMoveEnd` — the OL `moveend` seam that updates the view state |
+| `src/app/lib/map-fit.ts` | `fitBbox` — the centre and zoom `map.fitBounds` moves to |
 
 ## Extending the host API? Update the agent bridge
 

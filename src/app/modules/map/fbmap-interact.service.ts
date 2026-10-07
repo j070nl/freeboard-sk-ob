@@ -22,6 +22,7 @@ import {
 } from '../skresources';
 import { GeoJSONFeature } from 'ol/format/GeoJSON';
 import { AlertData } from '../alarms';
+import { ActiveRoutePoint } from './route-point-pick';
 
 export interface IPopover {
   id: string;
@@ -39,14 +40,16 @@ export interface IPopover {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: any[];
   featureCount: number;
-  resource?:
-    [string, SKRoute | SKWaypoint | SKNote | SKRegion] | GeoJSONFeature;
+  resource?: [string, SKRoute | SKWaypoint | SKNote | SKRegion];
+  /** The feature a resource set popover shows. */
+  resourceSet?: GeoJSONFeature;
   vessel?: SKVessel;
   isSelf?: boolean;
   aton?: SKAtoN;
   meteo?: SKMeteo;
   aircraft?: SKAircraft;
   alarm?: AlertData;
+  routePoint?: ActiveRoutePoint;
   s57Feature?: Record<string, string | number>;
   tidal?: { speedLabel: string; directionLabel: string };
   trackHistory?: {

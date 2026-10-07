@@ -162,6 +162,12 @@ export class RouteBufferRegistry {
     return undefined;
   }
 
+  /** Snapshot of the buffer for stored route `id`: keyed by it, or backed by
+   *  it while still keyed under the drawing it was saved or started from. */
+  getForRoute(id: string): RouteBuffer | undefined {
+    return this.get(id) ?? this.getByHref(id);
+  }
+
   /** Non-reactive snapshot of every buffer (does not read the live() signal, so
    *  it is safe to call inside an effect that also mutates the registry). */
   all(): RouteBuffer[] {
@@ -296,7 +302,8 @@ export class RouteBufferRegistry {
     return {
       position: [...p.position] as RoutePoint['position'],
       ...(p.name !== undefined ? { name: p.name } : {}),
-      ...(p.description !== undefined ? { description: p.description } : {})
+      ...(p.description !== undefined ? { description: p.description } : {}),
+      ...(p.href !== undefined ? { href: p.href } : {})
     };
   }
 

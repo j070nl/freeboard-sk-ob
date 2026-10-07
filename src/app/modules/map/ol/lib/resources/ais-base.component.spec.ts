@@ -1,3 +1,6 @@
+// Enter the circular map/app graph through its production root before the leaf.
+// Keep test module isolation enabled; otherwise load order masks this cycle.
+import 'src/app/app.component';
 import { describe, it, expect } from 'vitest';
 import { AISBaseLayerComponent, SKTarget } from './ais-base.component';
 

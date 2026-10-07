@@ -59,6 +59,31 @@ mutates the feature geometry re-derives the drawn form by itself — you keep li
 feedback while editing, and no split vertex can ever reach saved data, without
 maintaining a shadow feature.
 
+### The waypoint cache holds only the waypoints shown on the map
+
+**The trap.** `SKResourceService.fromCache('waypoints', id)` (and the `waypoints()`
+signal behind it) reads like a lookup into every waypoint on the server. It is not.
+`refreshWaypoints()` keeps only the waypoints selected for display (`waypoint[2]`)
+from the current fetch. A waypoint the user has hidden in the Waypoints list, or one
+outside the fetch area, is simply absent. Nothing fails: the lookup returns
+`undefined`, and the code falls through to whatever it does for an unknown id. This
+matters wherever one resource points at another by `href`, such as a route point
+stored as `{ href: "/resources/waypoints/<id>" }` (what **Build Route** writes). The
+reference resolves while the waypoint is on the chart and stops resolving when the
+user hides it.
+
+**What to do instead.** Treat a cache miss as normal, not as a broken reference.
+Fall back to data you already hold, such as a `name` stored next to the `href`.
+Fetch from the server only if the value really must be current. When testing,
+remember that the result depends on what is displayed: tick the waypoint in the
+Waypoints list before expecting a reference to resolve, and test the hidden case
+too.
+
+A related constraint applies when you build test routes by hand: the server
+validates each `coordinatesMeta` entry as either a name entry (`name` required, other
+fields allowed, so `{ name, href }` is fine) or a bare `{ href }`. An entry with
+neither, such as `{}` or `{ description }`, is rejected with a 400.
+
 ---
 
 ## When coding
@@ -274,6 +299,39 @@ The shared helpers (`worldCopyOffset`, the event `worldOffset`, `ol-overlay`'s
 `worldOffset` input) and the render-vs-data-space rule are in `AGENTS.md` and #576 —
 route new placement/hit-test code through them rather than re-deriving with
 `toLonLat`/`fromLonLat` or `±360` shifts.
+
+### A map extent is not API bounds — normalise it before it leaves the host
+
+**The trap.** `olMap.getMapExtent()` (`calculateExtent` transformed to EPSG:4326,
+also what `app.mapExtent` holds) looks like a ready-made lon/lat box to hand to an
+extension or a server query. It isn't, in two ways:
+
+- **It runs past ±180.** OpenLayers lets the view scroll round the world without
+  limit, and the extent follows. The centre OL reports is normalised, the extent is
+  not: after panning a few times at low zoom, a view of the Americas came back as
+  `[219.3, -64.3, 399.3, 44.8]` with centre `-50.7`, a centre outside its own box.
+  Before #848, `map.getView` / `map.view` passed exactly that to extensions, and a
+  Signal K API rejects or matches nothing for longitudes like that. A view
+  straddling 180° is `[174.3, …, 185.5, …]`, never `west > east`.
+- **On a rotated (heading-up) map it is the box *around* the turned viewport.** At
+  45° it covers roughly twice what is on screen, so an "is this in view?" test
+  built on it says yes for things in the box's corners.
+
+**What to do instead.** Treat the extent as render-space data and convert at the
+boundary, as with the other world-copy traps above:
+
+- Reporting a box to anything outside the map (an extension, the server, a URL):
+  `normalizeBounds` from `signalk-plotterext-bus` gives `[west, south, east, north]`
+  with longitudes in range and `west > east` across 180°, the convention in the
+  Plotter Extensions spec (*Map view → Bounding boxes*) and the Track API.
+- Fitting the map to a box, or testing a box against the view: use `fitBbox` /
+  `bboxInView` in `src/app/lib/map-fit.ts`. They handle `west > east`, world copies
+  and rotation, and `fitBbox` caps a single-point box at `FIT_MAX_ZOOM`. Don't
+  average `west` and `east` for a centre, or take `east - west` for a width; both
+  are wrong for a box crossing 180°.
+- If "in view" must be exact on a rotated map, test against the rotated viewport
+  (e.g. project the box's corners with `map.getPixelFromCoordinate`), not the
+  extent. The Track history window accepts the extent's over-coverage by design.
 
 ### Adding a map-click behaviour alongside an OL `Modify`/`Draw` interaction — don't guard on `e.features`
 
@@ -863,6 +921,72 @@ that state through the resource list's **select-all** toggle, which calls
 an all-inclusive array behind, which still counts as filtered and silently masks
 the bug. Confirm the config value before concluding anything from a manual repro.
 
+### Driving Freeboard through `fsk-mcp`: target your own tab — a move sent to a background tab lands later
+
+**The trap.** `fsk_list_sessions` lists **every** connected Freeboard tab: the
+maintainer's own tab, your agent's browser pane, and sessions from tabs since
+reloaded, which linger in the list. Every other `fsk_*` tool defaults to the most
+recently connected session, and passing the wrong `session` drives someone else's
+chart. It fails quietly. A `map.center` / `map.fitBounds` sent to a tab in the
+background returns `{}`, and `fsk_get_view` on that tab still shows the old view,
+so it reads as a no-op. It isn't: the request sits in `AppFacade.mapMoveRequest`
+until Angular's effects run for that tab again, so the chart **jumps when the user
+comes back to it**. The move also turns follow-vessel off, as every requested move
+does. Real near-miss: while checking antimeridian bounds, a move to Fiji went to the
+maintainer's tab instead of the agent's.
+
+**What to do instead.**
+
+- **Identify your session before any tool that moves or edits.** After you reload
+  your own tab, it is normally the newest `connectedAt`. Confirm it by comparing
+  `fsk_get_view`'s `center` with the tab's own
+  `JSON.parse(localStorage.freeboard_config).map.center` (read in your tab), and
+  pass that `session` explicitly on every call.
+- **If you did send a move to the wrong tab,** send that tab its current view
+  (`fsk_set_view` with the `center` and `zoom` `fsk_get_view` just reported). The
+  newer request replaces the held one, so nothing jumps. Tell the user their
+  follow-vessel mode was turned off.
+- A move that seems to have done nothing in a tab you aren't looking at has most
+  likely been held, not dropped.
+
+### The sample data has no true wind — inject it to test laylines and wind overlays
+
+**The trap.** `bin/n2k-from-file` replays `samples/aava-n2k.data`, and its wind is
+**apparent only** (every PGN 130306 frame carries the apparent reference). There is
+no magnetic variation (PGN 127258), no `performance.beatAngle` / `gybeAngle`, and no
+active destination. Anything Freeboard draws from true wind — laylines, the wind
+vectors, any true-vs-magnetic comparison — has nothing to work with. It draws
+nothing, which reads as "the feature is broken" or "my fix did nothing". A
+recorded log of your own boat may lack the same paths.
+
+**What to do instead.** Supply the missing data yourself:
+
+- Set a destination through the Course API
+  (`PUT /signalk/v2/api/vessels/self/navigation/course/destination` with
+  `{"position": {"latitude": …, "longitude": …}}`).
+- Push the missing paths into the server's stream from a small Node client (the `ws` package),
+  about once a second, with a token from `POST /signalk/v1/auth/login`:
+
+  ```js
+  const ws = new WebSocket(`ws://localhost:3000/signalk/v1/stream?subscribe=none&token=${token}`);
+  const rad = (d) => (d * Math.PI) / 180;
+  const VAR = 12.8, TWD = 30; // a large variation makes true/magnetic mix-ups obvious
+  ws.on('open', () => setInterval(() => ws.send(JSON.stringify({
+    context: 'vessels.self',
+    updates: [{ values: [
+      { path: 'navigation.magneticVariation', value: rad(VAR) },
+      { path: 'environment.wind.directionTrue', value: rad(TWD) },
+      { path: 'environment.wind.directionMagnetic', value: rad(TWD - VAR) },
+      { path: 'environment.wind.speedTrue', value: 7 },
+      { path: 'performance.beatAngle', value: rad(45) },
+      { path: 'performance.gybeAngle', value: rad(150) }
+    ] }]
+  })), 1000));
+  ```
+
+- Injected values stay in the server's state after the client stops, until the
+  server restarts. Tell whoever owns the server what you left behind.
+
 ### Tile-layer image loads are invisible to Resource Timing — and a cache hit looks like "never fired"
 
 **The trap.** Verifying that a raster chart re-fetches its tiles (auto-refresh,
@@ -1123,6 +1247,22 @@ Two consequences worth planning for, because both cost a rate-limited review:
 Upstream `SignalK/freeboard-sk` is well past the star threshold and reviews
 automatically, so none of this applies there.
 
+### A PR that builds on another unmerged PR: open it as a draft
+
+**The trap.** A pull request from a fork can only target a branch of the upstream
+repository, not your other PR's branch. So a change that depends on an unmerged PR
+has to be opened against `master`, and its diff includes every commit of the PR it
+builds on. Open it as a normal PR and CodeRabbit reviews that code a second time.
+That uses a rate-limited review that the first PR already needed, and it mixes
+findings about both changes on the second PR.
+
+**What to do instead.** Open the dependent PR as a **draft**, and say in the
+description which PR it builds on. CodeRabbit does not review drafts by default. It
+posts *"Draft PR not reviewed"*, and no review is used. Once the first PR is merged,
+rebase the dependent branch onto `master` (the routine rebase force-push), check that
+the diff now contains only its own commits, and mark it ready for review. If no
+review starts, post `@coderabbitai review` as a comment.
+
 ### The Prettier CI gate covers only `ts|html` — don't `prettier --write` the CSS or the docs
 
 **The trap.** CI's format check runs `format:check` =
@@ -1150,6 +1290,27 @@ fix. Only `ts`/`html` go through Prettier (`npm run format`).
 Lessons that apply to a class of setups rather than everyone. Scope each by the
 condition that makes it relevant (e.g. *"If you're developing on Windows, …"*, *"If
 your charts live on a Raspberry Pi microSD, …"*).
+
+### If an agent drives Freeboard with synthetic mouse drags, the whole app can slide sideways
+
+**The condition.** An AI agent testing in a browser it controls (a built-in
+browser pane, a CDP/DevTools-driven tab) pans the chart with synthetic
+`left_click_drag` events.
+
+**The trap.** A drag that starts near the left edge of the window, over or beside
+the toolbar, can scroll the `mat-sidenav-container` horizontally instead of panning
+the map. One observed case moved it 250px. The whole app slides left, leaving a blank
+strip on the right and the toolbar partly off-screen. It looks exactly like a layout
+bug in whatever you just changed, and it persists until reload.
+
+**What to do instead.** Start drags from the middle of the map, well clear of the
+toolbars. Better, move the map through `dev-tools/fsk-mcp` (`fsk_set_view`,
+`fsk_fit_bounds`), which is exact and needs no pointer at all. If the app has slid,
+reset it from the page instead of reloading:
+
+```js
+document.querySelector('mat-sidenav-container').scrollLeft = 0
+```
 
 ### If you need to debug the armv7 (Cerbo GX) CI leg, reproduce it in Docker
 

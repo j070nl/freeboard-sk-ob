@@ -25,6 +25,8 @@ import { CourseService } from '../../course';
 import { Convert } from 'src/app/lib/convert';
 import { RouteBufferRegistry } from '../../plotterext/route-buffer.registry';
 import { buildRoutePoints, editsRouteBuffer } from './route-reorder.util';
+import { routePointsMeta } from './route-points-meta.util';
+import { followedPointIndex } from '../../map/route-point-pick';
 
 @Component({
   selector: 'ap-dest-modal',
@@ -235,7 +237,17 @@ export class ActiveResourcePropertiesModal implements OnInit {
           : 'Route Points';
 
         if (this.data.resource[0] === this.app.data.activeRoute) {
-          this.selIndex.update(() => this.course.courseData().pointIndex);
+          // The points are listed in the order the route is stored.
+          const { pointIndex } = this.course.courseData();
+          this.selIndex.set(
+            pointIndex < 0
+              ? -1
+              : followedPointIndex(
+                  pointIndex,
+                  this.points.length,
+                  this.app.data.activeRouteReversed
+                )
+          );
           this.showClearButton.set(true);
         }
         this.readOnly =
@@ -256,48 +268,11 @@ export class ActiveResourcePropertiesModal implements OnInit {
   }
 
   getPointsMeta() {
-    if (
-      this.data.resource[1].feature.properties.coordinatesMeta &&
-      Array.isArray(this.data.resource[1].feature.properties.coordinatesMeta)
-    ) {
-      const pointsMeta =
-        this.data.resource[1].feature.properties.coordinatesMeta.map((p) => {
-          return {
-            name: p?.name ?? '',
-            description: p?.description ?? ''
-          };
-        });
-      let idx = 0;
-      return pointsMeta.map((pt) => {
-        idx++;
-        if (pt.href) {
-          const id = pt.href.split('/').slice(-1);
-          const wpt = this.skres.fromCache('waypoints', id[0]);
-          return wpt
-            ? {
-                name: `* ${wpt[1].name}`,
-                description: `* ${wpt[1].description}`
-              }
-            : {
-                name: '!wpt reference!',
-                description: ''
-              };
-        } else {
-          return {
-            name: pt.name ?? `RtePt-${('000' + String(idx)).slice(-3)}`,
-            description: pt.description ?? ``
-          };
-        }
-      });
-    } else {
-      let idx = 0;
-      return this.points.map(() => {
-        return {
-          name: `RtePt-${('000' + String(++idx)).slice(-3)}`,
-          description: ''
-        };
-      });
-    }
+    return routePointsMeta(
+      this.points.length,
+      this.data.resource[1].feature.properties.coordinatesMeta,
+      (id) => this.skres.fromCache('waypoints', id)?.[1] as SKWaypoint
+    );
   }
 
   drop(e: CdkDragDrop<{ previousIndex: number; currentIndex: number }>) {

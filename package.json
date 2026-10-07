@@ -1,6 +1,6 @@
 {
   "name": "@signalk/freeboard-sk",
-  "version": "3.2.0-beta.4",
+  "version": "3.2.1-openbridge.1",
   "description": "Openlayers chart plotter implementation for Signal K",
   "keywords": [
     "signalk-webapp",
@@ -24,17 +24,21 @@
     ],
     "recommends": [
       "signalk-charts-provider-simple",
+      "@signalk/tracks-plugin",
+      "signalk-buddylist-plugin",
       "signalk-instrument-widgets",
       "signalk-symbol-manager",
       "@signalk/open-meteo-provider",
       "signalk-basic-tide-widgets",
-      "signalk-restricted-areas"
+      "signalk-restricted-areas",
+      "@marineyachtradar/signalk-plugin",
+      "signalk-flags"
     ]
   },
   "engines": {
     "node": ">=18"
   },
-  "repository": "https://github.com/SignalK/freeboard-sk",
+  "repository": "https://github.com/j070nl/freeboard-sk-ob",
   "main": "plugin/index.js",
   "signalk-plugin-enabled-by-default": true,
   "scripts": {
@@ -59,7 +63,8 @@
     "test:ci": "node scripts/test-ci.mjs",
     "test:tools": "vitest run --config dev-tools/changelog/vitest.config.mjs",
     "test:helper": "vitest run --config helper/vitest.config.mts",
-    "version": "node dev-tools/changelog/index.mjs stamp && git add features/changelog.json"
+    "version": "node dev-tools/changelog/index.mjs stamp && git add features/changelog.json",
+    "test:openbridge": "node dev-tools/openbridge-integration/test.mjs"
   },
   "author": "AdrianP",
   "contributors": [
@@ -77,7 +82,7 @@
     "google-protobuf": "^4.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
-    "signalk-plotterext-bus": "^0.13.0",
+    "signalk-plotterext-bus": "^0.15.0",
     "tslib": "^2.0.0",
     "unified": "^11.0.5",
     "uuid": "^14.0.1"

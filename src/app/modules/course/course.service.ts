@@ -6,7 +6,9 @@ import { SKResourceService, SKVessel } from '../skresources';
 import { CourseData, FBRoute, SKCourseApi, SKPosition } from 'src/app/types';
 import type { PointDestination } from '@signalk/server-api';
 import { HttpErrorResponse } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Convert } from 'src/app/lib/convert';
+import { followedPointIndex } from '../map/route-point-pick';
 
 // ** Signal K course operations
 @Injectable({ providedIn: 'root' })
@@ -54,26 +56,33 @@ export class CourseService {
    * @param id Route identifier
    * @param startPoint Index of point in route to set as the active destination
    * @param reverse Follow route in reverse point order
+   * @returns Whether the server accepted the route; a rejection has already
+   * been reported to the user.
    */
-  public activateRoute(id: string, startPoint = 0, reverse = false) {
-    this.signalk.api
-      .putWithContext(
-        this.app.skApiVersion,
-        'self',
-        'navigation/course/activeRoute',
-        {
-          href: `/resources/routes/${id}`,
-          reverse: reverse,
-          pointIndex: startPoint,
-          arrivalCircle: this.app.config.course.arrivalCircle
-        }
-      )
-      .subscribe(
-        () => undefined,
-        (err: HttpErrorResponse) => {
-          this.app.parseHttpErrorResponse(err);
-        }
+  public async activateRoute(
+    id: string,
+    startPoint = 0,
+    reverse = false
+  ): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.signalk.api.putWithContext(
+          this.app.skApiVersion,
+          'self',
+          'navigation/course/activeRoute',
+          {
+            href: `/resources/routes/${id}`,
+            reverse: reverse,
+            pointIndex: startPoint,
+            arrivalCircle: this.app.config.course.arrivalCircle
+          }
+        )
       );
+      return true;
+    } catch (err) {
+      this.app.parseHttpErrorResponse(err as HttpErrorResponse);
+      return false;
+    }
   }
 
   /**
@@ -186,7 +195,34 @@ export class CourseService {
   }
 
   /**
-   * @description Set destination to the route point with the supplied index.
+   * @description Set the arrival circle of the course being followed.
+   * @param radius Radius in metres.
+   * @returns Whether the server accepted it; a rejection has already been
+   * reported to the user.
+   */
+  public async setArrivalCircle(radius: number): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.signalk.api.putWithContext(
+          this.app.skApiVersion,
+          'self',
+          'navigation/course/arrivalCircle',
+          { value: radius }
+        )
+      );
+      return true;
+    } catch (err) {
+      this.app.parseHttpErrorResponse(err as HttpErrorResponse);
+      return false;
+    }
+  }
+
+  /**
+   * @description Set destination to the route point with the supplied index,
+   * along the route's legs: the leg into it starts at the point before it. That
+   * keeps an arrival advance on the planned track, even when the vessel passed
+   * the point off to one side; to head straight from the vessel, use
+   * rejoinRouteAt.
    * @param pointIndex 0 based index of route point.
    */
   public coursePointIndex(pointIndex: number) {
@@ -205,6 +241,51 @@ export class CourseService {
           this.app.parseHttpErrorResponse(err);
         }
       );
+  }
+
+  /**
+   * @description Rejoin the active route at its point `pointIndex`: head
+   * straight there from the vessel, then follow the route on. Setting the point
+   * alone measures cross-track error along the route's leg into it; the
+   * restart starts that leg at the vessel instead.
+   * @param pointIndex 0 based index of the route point, in the order the
+   * route is being followed.
+   * @returns Whether the server accepted both steps; a rejection has already
+   * been reported to the user.
+   */
+  public async rejoinRouteAt(pointIndex: number): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.signalk.api.putWithContext(
+          this.app.skApiVersion,
+          'self',
+          'navigation/course/activeRoute/pointIndex',
+          { value: pointIndex }
+        )
+      );
+      await firstValueFrom(
+        this.signalk.api.putWithContext(
+          this.app.skApiVersion,
+          'self',
+          'navigation/course/restart',
+          null
+        )
+      );
+      return true;
+    } catch (err) {
+      this.app.parseHttpErrorResponse(err as HttpErrorResponse);
+      return false;
+    }
+  }
+
+  /**
+   * @description Skip route point `pointIndex`, the one being headed for as
+   * the user saw it: head straight for the one after it. Taking the index from
+   * the screen rather than the live course means a skip that crosses an
+   * arrival re-targets the new point instead of skipping it too.
+   */
+  public skipRoutePoint(pointIndex: number): Promise<boolean> {
+    return this.rejoinRouteAt(pointIndex + 1);
   }
 
   /**
@@ -458,7 +539,15 @@ export class CourseService {
         return pt?.name ?? '';
       });
       if (c.pointIndex !== -1 && c.pointIndex < c.pointNames.length) {
-        c.destPointName = c.pointNames[c.pointIndex];
+        // Point names are in the order the route is stored.
+        c.destPointName =
+          c.pointNames[
+            followedPointIndex(
+              c.pointIndex,
+              c.activeRoutePoints.length,
+              this.app.data.activeRouteReversed
+            )
+          ];
       }
     }
     // is route circular?
