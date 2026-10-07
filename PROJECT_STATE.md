@@ -1,5 +1,20 @@
 # Project state
 
+## Freeboard OpenBridge 3.2.1 LIVE — 2026-10-07
+
+User-authorized static frontend deployment from integration commit 53ace85a.
+300 files verified on disk and Signal K HTTP; same /@signalk/freeboard-sk/ URL.
+Helper/package metadata 3.1.1 unchanged; no restart, profile/resource change or
+hardware commands. Original source checkout remains the baseline; the integration
+worktree supplies the live artifact. Full previous 487-file frontend was restored
+and hash-verified in a temporary directory before publication; production rollback
+not executed. Prior 101 focused tests/build apply; field checks remain with user.
+[Release and exact rollback](/home/pi/openplotter-project/releases/2026-10-07_112348_freeboard-3.2.1-openbridge.1/README.md).
+Next: operator reload/field check. User wants eventual upstream-package removal;
+that requires a separate own-package migration preserving helper/settings/SKIP
+URLs. Do not uninstall the current package while these still depend on it.
+Earlier candidate/not-deployed statements below are historical.
+
 ## Freeboard 3.2.1 OpenBridge candidate — 2026-10-07
 
 This checkout is the isolated integration worktree at
